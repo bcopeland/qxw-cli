@@ -52,32 +52,38 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 #include "qxw.h"
 #include "gui.h"
 
-static GThread*fth;
+static GThread *fth;
 
 volatile int abort_flag=0;
-static int fillmode; // 0=stopped, 1=filling all, 2=filling selection, 3=word lists only (for preexport)
+
+// 0=stopped, 1=filling all, 2=filling selection, 3=word lists only (for preexport)
+static int fillmode;
 static clock_t ct0;
 
-int filler_status; // return code: -5: aborted; -3, -4: initflist errors; -2: out of stack; -1: out of memory; 0: stopped; 1: no fill found; 2: fill found; 3: running
+// return code: -5: aborted; -3, -4: initflist errors; -2: out of stack; -1: out of memory; 0: stopped; 1: no fill found; 2: fill found; 3: running
+int filler_status;
 
 // the following stacks keep track of the filler state as it recursively tries to fill the grid
-static int sdep=-1; // stack pointer
+static int sdep = -1; // stack pointer
 
-static char**sposs;                // possibilities for this entry, 0-terminated
-static int*spossp;                 // which possibility we are currently trying (index into sposs)
-static int***sflist;                 // pointers to restore feasible word list flist
-static struct jdata***sjdata;      // jumble data
-static ABM***sjflbm;               // jumble data feasible list bitmaps
-static struct sdata***ssdata;      // spread data
-static int**sflistlen;             // pointers to restore flistlen
-static ABM**sentryfl;              // feasible letter bitmap for this entry
-static int*sentry;                 // entry considered at this depth
+static char **sposs;               // possibilities for this entry, 0-terminated
+static int *spossp;                // which possibility we are currently trying (index into sposs)
+static int ***sflist;              // pointers to restore feasible word list flist
+static struct jdata ***sjdata;     // jumble data
+static ABM ***sjflbm;              // jumble data feasible list bitmaps
+static struct sdata ***ssdata;     // spread data
+static int **sflistlen;            // pointers to restore flistlen
+static ABM **sentryfl;             // feasible letter bitmap for this entry
+static int *sentry;                // entry considered at this depth
 
-static unsigned char*aused;       // answer already used while filling
-static unsigned char*lused;       // light already used while filling
+static unsigned char *aused;       // answer already used while filling
+static unsigned char *lused;       // light already used while filling
 
-#define isused(l) (lused[lts[l].uniq]|aused[lts[l].ans+NMSG])
-#define setused(l,v) lused[lts[l].uniq]=v,aused[lts[l].ans+NMSG]=v // ,printf("setused(%d,%d)->%d\n",l,v,lts[l].uniq)
+#define isused(l) (lused[lts[l].uniq] | aused[lts[l].ans+NMSG])
+#define setused(l,v) do { \
+	lused[lts[l].uniq]=v; \
+	aused[lts[l].ans+NMSG]=v; \
+} while (0)
 
 static void pstate(int f) {
 	int i,j,jmode;
