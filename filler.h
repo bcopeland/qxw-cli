@@ -28,8 +28,8 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 #define __FILLER_H__
 
 // control functions for filler called from main code
-extern void filler_init();
-extern void filler_finit();
+extern int filler_init(int mode);
+extern int filler_destroy();
 extern int filler_start(int mode);
 extern void filler_wait();
 extern void filler_stop();

@@ -958,13 +958,8 @@ ex0:
 }
 
 
-
-
-
-// EXTERNAL INTERFACE
-
-// returns  !=  0 on error
-int filler_start(int mode) {
+int filler_init(int mode)
+{
 	int i;
 
 	assert(fth == 0);
@@ -984,6 +979,21 @@ int filler_start(int mode) {
 
 	state_push();
 	filler_status = 3;
+	return 0;
+}
+
+int filler_destroy()
+{
+	state_finit();
+	return 0;
+}
+
+
+// EXTERNAL INTERFACE
+
+// returns  !=  0 on error
+int filler_start(int mode) {
+	filler_init(mode);
 	fth = g_thread_create_full(&fillerthread, 0, 0, 1, 1,
 		fillmode == 3 ? G_THREAD_PRIORITY_LOW : G_THREAD_PRIORITY_NORMAL, 0);
 
