@@ -54,7 +54,6 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 
 static GThread*fth;
 
-static int ct_malloc=0,ct_free=0; // counters for debugging
 volatile int abort_flag=0;
 static int fillmode=0; // 0=stopped, 1=filling all, 2=filling selection, 3=word lists only (for preexport)
 static clock_t ct0;
@@ -117,7 +116,6 @@ static void pstate(int f) {
 
 // transfer progress info to display
 static void progress(void) {
-	DEB1 printf("ct_malloc=%d ct_free=%d diff=%d\n",ct_malloc,ct_free,ct_malloc-ct_free);
 	gdk_threads_enter();
 	updategrid();
 	gdk_threads_leave();
@@ -413,19 +411,15 @@ static int settleents(void) {
 			w->sdata=0;
 			w->flist=(int*)malloc(l*sizeof(int)); // new list can be at most as long as old one
 			if(!w->flist) return -1; // out of memory
-			ct_malloc++;
 			if(jmode==1) {
 				w->jdata=(struct jdata*)malloc(l*sizeof(struct jdata));
 				if(!w->jdata) return -1; // out of memory
-				ct_malloc++;
 				w->jflbm=(ABM*)malloc(l*mj*sizeof(ABM));
 				if(!w->jflbm) return -1; // out of memory
-				ct_malloc++;
 			}
 			if(jmode==2) {
 				w->sdata=(struct sdata*)malloc(l*sizeof(struct sdata));
 				if(!w->sdata) return -1; // out of memory
-				ct_malloc++;
 			}
 		}
 		if(afunique) { // the following test makes things quite a lot slower: consider optimising by keeping track of when an update might be needed
@@ -778,22 +772,18 @@ static void state_restore(void) {int i,j,l; struct word*w;
 		}
 		if(sflistlen[sdep][i]!=-1&&w->flist!=0) { // word feasible list to free?
 			free(w->flist);
-			ct_free++;
 			w->flist=sflist[sdep][i];
 			w->flistlen=sflistlen[sdep][i];
 			if(w->jdata) {
 				free(w->jdata);
-				ct_free++;
 				w->jdata=sjdata[sdep][i];
 			}
 			if(w->jflbm) {
 				free(w->jflbm);
-				ct_free++;
 				w->jflbm=sjflbm[sdep][i];
 			}
 			if(w->sdata) {
 				free(w->sdata);
-				ct_free++;
 				w->sdata=ssdata[sdep][i];
 			}
 		}
@@ -931,7 +921,6 @@ static void searchdone() {
 		assert(words[i].commitdep==-1); // ... and uncommitted
 	}
 	DEB1 printf("search done\n");
-	DEB1 printf(">> ct_malloc=%d ct_free=%d diff=%d\n",ct_malloc,ct_free,ct_malloc-ct_free);fflush(stdout);
 	// j=0; for(i=0;i<ltotal;i++) j+=isused[i]; printf("total lused=%d\n",j);fflush(stdout);
 	return;
 }
