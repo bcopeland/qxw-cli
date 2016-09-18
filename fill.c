@@ -35,6 +35,7 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 #include <wchar.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <errno.h>
 
 #include "common.h"
 #include "qxw.h"
@@ -1900,6 +1901,10 @@ ew0:
 		else if(loaddefdicts()) reperr("No dictionaries loaded");
 		strcpy(filenamebase,"");
 	}
+
+	read_grid(stdin);
+
+	bldstructs();
 	filler_init(1);
 	filler_search();
 	accept_hints();
@@ -1975,6 +1980,64 @@ void updategrid(void) {int i;
   for(i=0;i<ne;i++) entries[i].flbmh=entries[i].flbm; // make back-up copy of hints
   }
 
+int read_grid(FILE *fp)
+{
+	char *line = NULL;
+	size_t len = 0;
+	size_t grid_w = 0, grid_h = 0;
+	ssize_t read;
+	char *grid;
+	int x, y;
+
+	resetstate();
+
+	while ((read = getline(&line, &len, fp)) > 0) {
+		grid = line;
+
+		/* trim whitespace */
+		while (*grid && isspace(*grid))
+			grid++;
+		while (strlen(grid) && isspace(grid[strlen(grid)-1]))
+			grid[strlen(grid)-1] = '\0';
+
+		if (!strlen(grid))
+			continue;
+
+		if (!grid_w)
+			grid_w = strlen(grid);
+
+		if (strlen(grid) != grid_w)
+			continue;
+
+		y = grid_h;
+		grid_h++;
+
+		if (grid_w >= MXSZ || grid_h >= MXSZ)
+			goto err;
+
+		/*
+		 * ok, grid_h / grid_w are valid, now set letters
+		 * and blocks based on grid values
+		 */
+		for (x = 0; x < grid_w; x++) {
+			if (grid[x] == '#') {
+				gsq[x][y].fl |= 1;
+				gsq[x][y].merge = 0;
+			} else if (grid[x] != '.') {
+				gsq[x][y].ctbm[0][0] = chartoabm[(int)grid[x]];
+			}
+		}
+	}
+	width = grid_w;
+	height = grid_h;
+	printf("width: %d height: %d\n", width, height);
+	return 0;
+err:
+	width = height = 0;
+	printf("E width: %d height: %d\n", width, height);
+	return -EIO;
+}
+
 void accept_hints()
 {
 	int de,nd,f,i,j,x,y;
@@ -2012,7 +2075,7 @@ void print_grid()
 				continue;
 
 			ch = getechar(i, j);
-			printf("%c", ch);
+			printf("%c", ch == ' ' ? '#' : ch);
 		}
 		printf("\n");
 	}
