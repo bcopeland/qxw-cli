@@ -50,7 +50,7 @@ char filenamebase[SLEN]; // base to use for constructing default filenames
 
 // these are saved:
 
-int width=12,height=12;          // grid size
+int width=4,height=4;          // grid size
 int gtype=0;                     // grid type: 0=square, 1=hexH, 2=hexV, 3=circleA (edge at 12 o'clock), 4=circleB (cell at 12 o'clock)
                                  // 5=cylinder L-R, 6=cylinder T-B, 7=Moebius L-R, 8=Moebius T-B, 9=torus
 int symmr=2,symmm=0,symmd=0;     // symmetry mode flags (rotation, mirror, up-and-down/left-and-right)
@@ -62,7 +62,7 @@ char gtitle[SLEN]="";
 char gauthor[SLEN]="";
 
 // these are not saved:
-int debug=0;                     // debug level
+int debug=0;
 
 int curx=0,cury=0,dir=0;         // cursor position, and direction: 0=to right, 1=down
 int unsaved=0;                   // edited-since-save flag
@@ -1837,72 +1837,77 @@ char*titlebyauthor(void) {static char t[SLEN*2+100];
 extern char*optarg;
 extern int optind,opterr,optopt;
 
-int main(int argc,char*argv[]) {int i,nd;
+int main(int argc,char*argv[]) {
 
-  srand((int)time(0));
-  for(i=0;i<26;i++) ltochar[i]   =i+'A',chartol[i   +'A']=i,chartol[i+'a']=i,chartoabm[i   +'A']=1ULL<<i,chartoabm[i+'a']=1ULL<<i;
-  for(i=0;i<10;i++) ltochar[i+26]=i+'0',chartol[i   +'0']=i+26              ,chartoabm[i   +'0']=1ULL<<(i+26);
-                    ltochar[36]  =  '-',chartol[(int)'-']=36                ,chartoabm[(int)'-']=1ULL<<36;
-  log2lut[0]=log2lut[1]=0; for(i=2;i<65536;i+=2) { log2lut[i]=log2lut[i/2]+1; log2lut[i+1]=0; }
-  resetstate();
-  for(i=0;i<MAXNDICTS;i++) dfnames[i][0]='\0';
-  for(i=0;i<MAXNDICTS;i++) strcpy(dsfilters[i],"");
-  for(i=0;i<MAXNDICTS;i++) strcpy(dafilters[i],"");
-  freedicts();
+	int i,nd;
 
-  nd=0;
-  i=0;
-  for(;;) switch(getopt(argc,argv,"d:?D:")) {
-  case -1: goto ew0;
-  case 'd':
-    if(strlen(optarg)<SLEN&&nd<MAXNDICTS) strcpy(dfnames[nd++],optarg);
-    break;
-  case 'D':debug=atoi(optarg);break;
-  case '?':
-  default:i=1;break;
-    }
+	srand((int)time(0));
+	for(i=0;i<26;i++) ltochar[i]   =i+'A',chartol[i   +'A']=i,chartol[i+'a']=i,chartoabm[i   +'A']=1ULL<<i,chartoabm[i+'a']=1ULL<<i;
+	for(i=0;i<10;i++) ltochar[i+26]=i+'0',chartol[i   +'0']=i+26              ,chartoabm[i   +'0']=1ULL<<(i+26);
+	ltochar[36]  =  '-',chartol[(int)'-']=36                ,chartoabm[(int)'-']=1ULL<<36;
+	log2lut[0]=log2lut[1]=0; for(i=2;i<65536;i+=2) { log2lut[i]=log2lut[i/2]+1; log2lut[i+1]=0; }
+	resetstate();
+	for(i=0;i<MAXNDICTS;i++) dfnames[i][0]='\0';
+	for(i=0;i<MAXNDICTS;i++) strcpy(dsfilters[i],"");
+	for(i=0;i<MAXNDICTS;i++) strcpy(dafilters[i],"");
+	freedicts();
 
-  ew0:
-  if(i) {
-    printf("Usage: %s [-d <dictionary_file>]* [qxw_file]\n",argv[0]);
-    printf("This is Qxw, release %s.\n\n\
-       Copyright 2011-2014 Mark Owen; Windows port by Peter Flippant\n\
-       \n\
-       This program is free software; you can redistribute it and/or modify\n\
-       it under the terms of version 2 of the GNU General Public License as\n\
-       published by the Free Software Foundation.\n\
-       \n\
-       This program is distributed in the hope that it will be useful,\n\
-       but WITHOUT ANY WARRANTY; without even the implied warranty of\n\
-       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n\
-       GNU General Public License for more details.\n\
-       \n\
-       You should have received a copy of the GNU General Public License along\n\
-       with this program; if not, write to the Free Software Foundation, Inc.,\n\
-       51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.\n\
-       \n\
-       For more information visit http://www.quinapalus.com or\n\
-       e-mail qxw@quinapalus.com\n\n\
-",RELEASE);
-    return 0;
-    }
+	nd=0;
+	i=0;
+	for(;;) switch(getopt(argc,argv,"d:?D:")) {
+		case -1: goto ew0;
+		case 'd':
+			 if(strlen(optarg)<SLEN&&nd<MAXNDICTS) strcpy(dfnames[nd++],optarg);
+			 break;
+		case 'D':debug=atoi(optarg);break;
+		case '?':
+		default:i=1;break;
+	}
+
+ew0:
+	if(i) {
+		printf("Usage: %s [-d <dictionary_file>]* [qxw_file]\n",argv[0]);
+		printf("This is Qxw, release %s.\n\n\
+				Copyright 2011-2014 Mark Owen; Windows port by Peter Flippant\n\
+				\n\
+				This program is free software; you can redistribute it and/or modify\n\
+				it under the terms of version 2 of the GNU General Public License as\n\
+				published by the Free Software Foundation.\n\
+				\n\
+				This program is distributed in the hope that it will be useful,\n\
+				but WITHOUT ANY WARRANTY; without even the implied warranty of\n\
+				MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n\
+				GNU General Public License for more details.\n\
+				\n\
+				You should have received a copy of the GNU General Public License along\n\
+				with this program; if not, write to the Free Software Foundation, Inc.,\n\
+				51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.\n\
+				\n\
+				For more information visit http://www.quinapalus.com or\n\
+				e-mail qxw@quinapalus.com\n\n\
+				",RELEASE);
+		return 0;
+	}
 
 
-  a_filenew(0); // reset grid
-  loadprefs(); // load preferences file (silently failing to defaults)
-  if(optind<argc&&strlen(argv[optind])<SLEN) {
-    strcpy(filename,argv[optind]);
-    a_load();
-  } else {
-    if(nd) loaddicts(0);
-    else if(loaddefdicts()) reperr("No dictionaries loaded");
-    strcpy(filenamebase,"");
-    }
-  compute(0);
-  filler_stop();
-  freedicts();
-  return 0;
-  }
+	a_filenew(0); // reset grid
+	loadprefs(); // load preferences file (silently failing to defaults)
+	if(optind<argc&&strlen(argv[optind])<SLEN) {
+		strcpy(filename,argv[optind]);
+		a_load();
+	} else {
+		if(nd) loaddicts(0);
+		else if(loaddefdicts()) reperr("No dictionaries loaded");
+		strcpy(filenamebase,"");
+	}
+	filler_init(1);
+	filler_search();
+	accept_hints();
+	print_grid();
+	filler_destroy();
+	freedicts();
+	return 0;
+}
 
 
 
@@ -1912,9 +1917,7 @@ int main(int argc,char*argv[]) {int i,nd;
 // (re-)start the filler when an edit has been made
 // Return non-zero if cannot start filler
 int compute(int mode) {
-  filler_stop(); // stop if already running
   if(bldstructs()) return 1; // failed?
-  if(filler_start(mode)) return 1;
   return 0;
   }
 
@@ -1971,3 +1974,74 @@ void mkfeas(void) {int l,x,y; int*p; struct word*w=0;
 void updategrid(void) {int i;
   for(i=0;i<ne;i++) entries[i].flbmh=entries[i].flbm; // make back-up copy of hints
   }
+
+void accept_hints()
+{
+	int de,nd,f,i,j,x,y;
+	ABM m;
+	struct entry *e;
+	ABM b;
+
+	for(x=0;x<width;x++) {
+		for(y=0;y<height;y++) {
+			e = gsq[x][y].e0;
+			if (!e)
+				continue;
+			de=getdech(x,y);
+			if(de==0) nd=1,de=1; else nd=ndir[gtype];
+			for(i=0;i<nd;i++) {
+				for(j=0;j<gsq[x][y].ctlen[i];j++) {
+					m=e->flbmh; // get hints bitmap
+					if(onebit(m)) gsq[x][y].ctbm[i][j]=m; // could consider removing the onebit() test but potentially confusing?
+					e++;
+				}
+			}
+		}
+	}
+}
+
+void print_grid()
+{
+	char ch;
+	int m, k;
+
+	int i, j;
+	for (j = 0; j < height; j++) {
+		for(i = 0; i < width; i++) {
+			if (!isingrid(i, j) || !isownmergerep(i, j))
+				continue;
+
+			ch = getechar(i, j);
+			printf("%c", ch);
+		}
+		printf("\n");
+	}
+
+#if 0
+    else if(c==' ') {
+      m=e->flbm;k=cbits(m); // any info from filler?
+      DEB4 printf("%16llx ",m);
+      if(k==0) c='?'; // no feasible letters
+      else if(k==1) c=ltochar[logbase2(m)]; // unique feasible letter
+      else c=' ';
+      s[0]=c;s[1]=0;
+      setrgbcolor(cc,0.75,0.75,0.75);
+      mgcentre(&u,&v,x,y,md,l);
+      ctext(cc,s,u,v+0.3*sc,.7*sc,getfstyle(x,y),1);
+      if(k>1&&k<pxsq/2) { // more than one feasible letter
+        u=1.0/k*sc; // size of red square
+        setrgbcolor(cc,1,0,0);
+        movetomgcentre(cc,x,y,md,l);
+        rmoveto(cc,u/2.0,u/2.0);
+        rlineto(cc,0,-u);
+        rlineto(cc,-u,0);
+        rlineto(cc,0,u);
+        closepath(cc);
+        fill(cc);
+        }
+      }
+			}
+		}
+	}
+#endif
+}

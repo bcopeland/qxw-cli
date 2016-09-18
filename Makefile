@@ -21,10 +21,10 @@
 # Fifth Floor, Boston, MA  02110-1301, USA.
 
 
-all:: qxw
+all:: fill qxw
 deb:: qxw
 
-CFLAGS := -Wall -fstack-protector --param=ssp-buffer-size=4 -Wformat -Wformat-security -Werror=format-security `pkg-config --cflags glib-2.0` `pkg-config --cflags gtk+-2.0` -I/opt/local/include
+CFLAGS := -g -Wall -fstack-protector --param=ssp-buffer-size=4 -Wformat -Wformat-security -Werror=format-security `pkg-config --cflags glib-2.0` `pkg-config --cflags gtk+-2.0` -I/opt/local/include
 LFLAGS := -Wl,-Bsymbolic-functions -Wl,-z,relro -L/opt/local/lib -lgtk-x11-2.0 -lgdk-x11-2.0 -lm -lcairo -lgobject-2.0 -lpcre -lglib-2.0 -pthread -lgthread-2.0
 # -lrt as well?
 ifneq ($(filter deb,$(MAKECMDGOALS)),)
