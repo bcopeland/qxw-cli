@@ -35,5 +35,6 @@ extern void filler_wait();
 extern void filler_stop();
 extern void getposs(struct entry*e,char*s,int r,int dash);
 extern int filler_status;
+extern int filler_search();
 
 #endif

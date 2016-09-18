@@ -33,6 +33,9 @@ else
   CFLAGS:= $(CFLAGS) -O9
 endif
 
+fill: fill.o filler.o
+	gcc -rdynamic -Wall -ldl fill.o filler.o dicts.o $(LFLAGS) -o fill
+
 qxw: qxw.o filler.o dicts.o gui.o draw.o Makefile
 	gcc -rdynamic -Wall -ldl qxw.o filler.o dicts.o gui.o draw.o $(LFLAGS) -o qxw
 

@@ -922,8 +922,7 @@ static void searchdone() {
 			llistp = NULL;llistn = 0; // no feasible word list
 			DEB1 printf("BG fill failed\n"),fflush(stdout);
 		}
-		if (fillmode == 1||fillmode == 2) killcurrdia();
-		updatefeas();
+		// updatefeas();
 	}
 	updategrid();
 	gdk_threads_leave();
@@ -955,6 +954,11 @@ static gpointer fillerthread(gpointer data) {
 ex0:
 	DEB1 printf("fillerthread() terminating filler_status = %d\n",filler_status);
 	return 0;
+}
+
+int filler_search()
+{
+	return fillerthread(NULL);
 }
 
 
