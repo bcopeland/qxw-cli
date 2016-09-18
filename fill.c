@@ -2075,7 +2075,10 @@ void print_grid()
 				continue;
 
 			ch = getechar(i, j);
-			printf("%c", ch == ' ' ? '#' : ch);
+			if (ch == ' ')
+				ch = gsq[i][j].fl ? '#' : '?';
+
+			printf("%c", ch);
 		}
 		printf("\n");
 	}
