@@ -1893,14 +1893,9 @@ ew0:
 
 	a_filenew(0); // reset grid
 	loadprefs(); // load preferences file (silently failing to defaults)
-	if(optind<argc&&strlen(argv[optind])<SLEN) {
-		strcpy(filename,argv[optind]);
-		a_load();
-	} else {
-		if(nd) loaddicts(0);
-		else if(loaddefdicts()) reperr("No dictionaries loaded");
-		strcpy(filenamebase,"");
-	}
+	nd = 1;
+	strcpy(dfnames[0], "all_dict");
+	loaddicts(0);
 
 	read_grid(stdin);
 
