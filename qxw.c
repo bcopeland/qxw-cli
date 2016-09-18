@@ -1910,7 +1910,6 @@ int main(int argc,char*argv[]) {int i,nd;
   g_thread_init(0);
   gdk_threads_init();
   gdk_threads_enter();
-  filler_init();
   gtk_init(&argc,&argv);
   startgtk();
   a_filenew(0); // reset grid
@@ -1930,7 +1929,6 @@ int main(int argc,char*argv[]) {int i,nd;
   filler_stop();
   draw_finit();
   stopgtk();
-  filler_finit();
   gdk_threads_leave();
   freedicts();
   return 0;

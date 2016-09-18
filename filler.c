@@ -998,9 +998,3 @@ void filler_stop(void) {
 	state_finit();
 	DEB1 printf("filler_stop() C\n");
 }
-
-void filler_init() {
-}
-
-void filler_finit() {
-}
