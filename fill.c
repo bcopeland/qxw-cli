@@ -123,55 +123,9 @@ int*llist=0;     // buffer for light index list
 struct square gsq[MXSZ][MXSZ];
 struct vl vls[NVL];
 
-int getnumber(int x,int y) {
-  return gsq[x][y].number;
-  }
-
-int getflags(int x,int y) {int xr,yr;
-  getmergerep(&xr,&yr,x,y);
-  return gsq[xr][yr].fl;
-  }
-
-int getbgcol(int x,int y) {int xr,yr;
-  getmergerep(&xr,&yr,x,y);
-  return (gsq[xr][yr].sp.spor?gsq[xr][yr].sp.bgcol:dsp.bgcol)&0xffffff;
-  }
-
-int getfgcol(int x,int y) {int xr,yr;
-  getmergerep(&xr,&yr,x,y);
-  return (gsq[xr][yr].sp.spor?gsq[xr][yr].sp.fgcol:dsp.fgcol)&0xffffff;
-  }
-
-int getmkcol(int x,int y) {int xr,yr;
-  getmergerep(&xr,&yr,x,y);
-  return (gsq[xr][yr].sp.spor?gsq[xr][yr].sp.mkcol:dsp.mkcol)&0xffffff;
-  }
-
-int getfstyle(int x,int y) {int xr,yr;
-  getmergerep(&xr,&yr,x,y);
-  return gsq[xr][yr].sp.spor?gsq[xr][yr].sp.fstyle:dsp.fstyle;
-  }
-
 int getdech(int x,int y) {int xr,yr;
   getmergerep(&xr,&yr,x,y);
   return gsq[xr][yr].sp.spor?gsq[xr][yr].sp.dech:dsp.dech;
-  }
-
-void getmk(char*s,int x,int y,int c) {int d,nd,nd2,xr,yr; char*t;
-  strcpy(s,"");
-  getmergerep(&xr,&yr,x,y);
-  t=gsq[xr][yr].sp.spor?gsq[xr][yr].sp.mk[c]:dsp.mk[c];
-  if(!strcmp(t,"\\#")) goto ew0; // if number, put it wherever necessary
-  d=getmergedir(x,y); // otherwise only in extreme corners of merge group
-  nd=ndir[gtype];
-  nd2=nd+nd;
-  if(d>=0) {
-    if(!ismerge(x,y,d   )&&(c-1-d+nd2)%nd2< nd) goto ew0;  // end of group   d=0:1,2/d=1:2,3
-    if(!ismerge(x,y,d+nd)&&(c-1-d+nd2)%nd2>=nd) goto ew0;
-    else return;
-    }
-ew0:
-  strcpy(s,t);
   }
 
 // move backwards one cell in direction d
@@ -278,11 +232,6 @@ int ismerge(int x,int y,int d) {int u;
   stepforw(&x,&y,d);
   if(!isingrid(x,y)) return 0;
   return u;
-  }
-
-int sqexists(int i,int j) { // is a square within the grid (and not cut out)?
-  if(!isingrid(i,j)) return 0;
-  return !(gsq[i][j].fl&8);
   }
 
 // is a step backwards clear? (not obstructed by a bar, block, cutout or edge of grid)
