@@ -1275,7 +1275,6 @@ void a_filenew(int flags) {
   char*p;
   int u,v,x,y;
 
-  filler_stop();
   resetstate();
   u=(flags>>16)&0xff;
   v=(flags>>8)&0xff;
