@@ -48,17 +48,4 @@ draw.o: draw.c qxw.h draw.h common.h Makefile
 clean:
 	rm -f dicts.o draw.o filler.o qxw.o qxw
 
-.PHONY: install
-install:
-	mkdir -p $(DESTDIR)/usr/games
-	cp -a qxw $(DESTDIR)/usr/games/qxw
-	mkdir -p $(DESTDIR)/usr/include/qxw
-	cp -a qxwplugin.h $(DESTDIR)/usr/include/qxw/qxwplugin.h
-	mkdir -p $(DESTDIR)/usr/share/applications
-	cp -a qxw.desktop $(DESTDIR)/usr/share/applications/qxw.desktop
-	mkdir -p $(DESTDIR)/usr/share/pixmaps
-	cp -a qxw.xpm $(DESTDIR)/usr/share/pixmaps/qxw.xpm
-	mkdir -p $(DESTDIR)/usr/share/icons/hicolor/48x48/apps
-	cp -a icon-48x48.png $(DESTDIR)/usr/share/icons/hicolor/48x48/apps/qxw.png
-
 ## REL-
