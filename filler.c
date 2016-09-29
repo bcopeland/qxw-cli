@@ -936,27 +936,31 @@ static void searchdone() {
 	return;
 }
 
-static gpointer fillerthread(gpointer data) {
+int filler_search()
+{
 	int i;
 	clock_t ct;
 
 	ct = ct0 = clock();
 	clueorderindex = 0;
-	if (buildlists()) goto ex0;
+	if (buildlists())
+		goto ex0;
+
 	DEB1 pstate(1);
-	for(i = 0;i<ne;i++) entries[i].upd = 1;
-	for(i = 0;i<nw;i++) words[i].upd = 1;
+	for(i = 0;i<ne;i++)
+		entries[i].upd = 1;
+	for(i = 0;i<nw;i++)
+		words[i].upd = 1;
+
 	filler_status = search();
-	if (fillmode !=  3) searchdone(); // tidy up unless in pre-export mode
+	if (fillmode != 3)
+		searchdone(); // tidy up unless in pre-export mode
+
 	DEB1 printf("search finished: %.3fs\n",(double)(clock()-ct)/CLOCKS_PER_SEC);
+
 ex0:
 	DEB1 printf("fillerthread() terminating filler_status = %d\n",filler_status);
 	return 0;
-}
-
-int filler_search()
-{
-	return fillerthread(NULL);
 }
 
 
