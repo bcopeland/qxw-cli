@@ -35,13 +35,13 @@ endif
 fill: fill.o filler.o dicts.o
 	gcc -rdynamic -Wall -ldl fill.o filler.o dicts.o $(LFLAGS) -o fill
 
-filler.o: filler.c qxw.h filler.h dicts.h common.h Makefile
+filler.o: filler.c filler.h dicts.h common.h Makefile
 	gcc $(CFLAGS) -c filler.c -o filler.o
 
 dicts.o: dicts.c dicts.h common.h Makefile
 	gcc $(CFLAGS) -fno-strict-aliasing -c dicts.c -o dicts.o
 
-draw.o: draw.c qxw.h draw.h common.h Makefile
+draw.o: draw.c draw.h common.h Makefile
 	gcc $(CFLAGS) -c draw.c -o draw.o
 
 .PHONY: clean

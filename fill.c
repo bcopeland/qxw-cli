@@ -38,7 +38,6 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 #include <errno.h>
 
 #include "common.h"
-#include "qxw.h"
 #include "filler.h"
 #include "dicts.h"
 

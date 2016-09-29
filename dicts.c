@@ -38,7 +38,6 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 #endif
 
 #include "common.h"
-#include "qxw.h"
 #include "dicts.h"
 
 // default dictionaries

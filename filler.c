@@ -49,7 +49,6 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 #include "common.h"
 #include "filler.h"
 #include "dicts.h"
-#include "qxw.h"
 
 static GThread *fth;
 
