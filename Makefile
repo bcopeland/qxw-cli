@@ -21,8 +21,7 @@
 # Fifth Floor, Boston, MA  02110-1301, USA.
 
 
-all:: fill qxw
-deb:: qxw
+all:: fill
 
 CFLAGS := -g -Wall -fstack-protector --param=ssp-buffer-size=4 -Wformat -Wformat-security -Werror=format-security `pkg-config --cflags glib-2.0` `pkg-config --cflags gtk+-2.0` -I/opt/local/include
 LFLAGS := -Wl,-Bsymbolic-functions -Wl,-z,relro -L/opt/local/lib -lgtk-x11-2.0 -lgdk-x11-2.0 -lm -lcairo -lgobject-2.0 -lpcre -lglib-2.0 -pthread -lgthread-2.0
@@ -33,30 +32,21 @@ else
   CFLAGS:= $(CFLAGS) -O9
 endif
 
-fill: fill.o filler.o
+fill: fill.o filler.o dicts.o
 	gcc -rdynamic -Wall -ldl fill.o filler.o dicts.o $(LFLAGS) -o fill
-
-qxw: qxw.o filler.o dicts.o gui.o draw.o Makefile
-	gcc -rdynamic -Wall -ldl qxw.o filler.o dicts.o gui.o draw.o $(LFLAGS) -o qxw
-
-qxw.o: qxw.c qxw.h filler.h dicts.h draw.h gui.h common.h Makefile
-	gcc $(CFLAGS) -c qxw.c -o qxw.o
-
-gui.o: gui.c qxw.h filler.h dicts.h draw.h gui.h common.h Makefile
-	gcc $(CFLAGS) -c gui.c -o gui.o
 
 filler.o: filler.c qxw.h filler.h dicts.h common.h Makefile
 	gcc $(CFLAGS) -c filler.c -o filler.o
 
-dicts.o: dicts.c dicts.h gui.h common.h Makefile
+dicts.o: dicts.c dicts.h common.h Makefile
 	gcc $(CFLAGS) -fno-strict-aliasing -c dicts.c -o dicts.o
 
-draw.o: draw.c qxw.h draw.h gui.h common.h Makefile
+draw.o: draw.c qxw.h draw.h common.h Makefile
 	gcc $(CFLAGS) -c draw.c -o draw.o
 
 .PHONY: clean
 clean:
-	rm -f dicts.o draw.o filler.o gui.o qxw.o qxw
+	rm -f dicts.o draw.o filler.o qxw.o qxw
 
 .PHONY: install
 install:

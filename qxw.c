@@ -48,7 +48,6 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 #include "qxw.h"
 #include "filler.h"
 #include "dicts.h"
-#include "gui.h"
 #include "draw.h"
 
 // GLOBAL PARAMETERS

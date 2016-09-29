@@ -36,7 +36,6 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 #include "common.h"
 #include "qxw.h"
 #include "draw.h"
-#include "gui.h"
 #include "dicts.h"
 
 int bawdpx,hbawdpx;
