@@ -41,6 +41,12 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 #include "filler.h"
 #include "dicts.h"
 
+void getmergerep(int*mx,int*my,int x,int y);
+void stepforw(int*x,int*y,int d);
+int read_grid(FILE *fp);
+void accept_hints();
+void print_grid();
+
 #define fserror(x) exit(0)
 
 char filename[SLEN+50]; // result from filedia()
@@ -304,7 +310,7 @@ void getmergerep(int*mx,int*my,int x,int y) {int d; // find merge representative
   getmergerepd(mx,my,x,y,d);
   }
 
-int isownmergerep(x,y) {int x0,y0;
+int isownmergerep(int x, int y) {int x0,y0;
   getmergerep(&x0,&y0,x,y);
   return x==x0&&y==y0;
   }
@@ -486,32 +492,6 @@ int setechar(int x,int y,int d,char c) {
 void clrcont(int x,int y) {int i,j;
   getmergerep(&x,&y,x,y);
   for(i=0;i<MAXNDIR;i++) for(j=0;j<gsq[x][y].ctlen[i];j++) gsq[x][y].ctbm[i][j]=ABM_ALNUM;
-  }
-
-
-
-
-
-static void setmerge(int x,int y,int d,int k) { // set merge state in direction d to k, make bar state consistent
-  if(d>=ndir[gtype]) {d-=ndir[gtype];stepback(&x,&y,d);}
-  if(!isingrid(x,y)) return;
-  if(k) k=1;
-  gsq[x][y].merge&=~(1<<d);
-  gsq[x][y].merge|=  k<<d;
-  gsq[x][y].bars &=~gsq[x][y].merge;
-  }
-
-static void setbars(int x,int y,int d,int k) { // set bar state in direction d to k, make merge state consistent
-  if(d>=ndir[gtype]) {d-=ndir[gtype];stepback(&x,&y,d);}
-  if(!isingrid(x,y)) return;
-  if(k) k=1;
-  gsq[x][y].bars &=~(1<<d);
-  gsq[x][y].bars |=  k<<d;
-  gsq[x][y].merge&=~gsq[x][y].bars;
-  }
-
-static void demerge(int x,int y) {int i; // demerge from all neighbours
-  for(i=0;i<ndir[gtype]*2;i++) setmerge(x,y,i,0);
   }
 
 // calculate mask of feasible symmetries
@@ -949,59 +929,6 @@ case 3: case 4:
     }
   }
 
-// basic grid editing commands (candidates for f() in symmdo above)
-void a_editblock (int k,int x,int y,int d) {int l,gx[MXCL],gy[MXCL];
-  l=getmergegroup(gx,gy,x,y);
-  gsq[x][y].fl=(gsq[x][y].fl&0x06)|1;
-  demerge(x,y);
-  }
-
-void a_editempty (int k,int x,int y,int d) {
-  gsq[x][y].fl= gsq[x][y].fl&0x16;
-  }
-
-void a_editcutout(int k,int x,int y,int d) {int l,gx[MXCL],gy[MXCL];
-  l=getmergegroup(gx,gy,x,y);
-  gsq[x][y].fl=(gsq[x][y].fl&0x06)|8;
-  demerge(x,y);
-  }
-
-// set bar state in direction d to k
-void a_editbar(int k,int x,int y,int d) {int tx,ty;
-  if(!isingrid(x,y)) return;
-  tx=x;ty=y;
-  stepforw(&tx,&ty,d);
-//  printf("<%d,%d %d,%d %d>\n",x,y,tx,ty,d);
-  if(!isingrid(tx,ty)) return;
-  setbars(x,y,d,k);
-  donumbers();
-  }
-
-// set merge state in direction d to k, deal with consequences
-void a_editmerge(int k,int x,int y,int d) {int f,i,l,tl,tx,ty,gx[MXCL],gy[MXCL],tgx[MXCL],tgy[MXCL];
-  if(!isclear(x,y)) return;
-  tx=x;ty=y;
-  stepforw(&tx,&ty,d);
-  if(!isclear(tx,ty)) return;
-  l=getmergegroup(gx,gy,x,y);
-  tl=getmergegroup(tgx,tgy,tx,ty);
-  if(k) for(i=0;i<ndir[gtype];i++) if(i!=d&&i+ndir[gtype]!=d) {
-    setmerge(x,y,i,0);
-    setmerge(x,y,i+ndir[gtype],0);
-    setmerge(tx,ty,i,0);
-    setmerge(tx,ty,i+ndir[gtype],0);
-    }
-  setmerge(x,y,d,k);
-  f=gsq[x][y].fl&16; // make selection flags consistent
-  l=getmergegroup(gx,gy,x,y);
-  for(i=0;i<l;i++) gsq[gx[i]][gy[i]].fl=(gsq[gx[i]][gy[i]].fl&~16)|f;
-  donumbers();
-  }
-
-
-
-
-
 // PREFERENCES
 
 int prefdata[NPREFS]={0,0,0,66,75, 1,0,36,36,0};
@@ -1084,7 +1011,7 @@ void saveprefs(void) {FILE*fp;
 
 
 
-static char*defaultmk(k) {return k?"":"\\#";} // default mark is just number in NW corner
+static char*defaultmk(int k) {return k?"":"\\#";} // default mark is just number in NW corner
 
 void make7bitclean(char*s) {
   char*t;
@@ -1238,32 +1165,6 @@ static void resetstate(void) {int i,j,k,u0,u1;
   for(i=0;i<1000;i++) {u0=rand()%26; u1=rand()%26; j=cwperm[u0]; cwperm[u0]=cwperm[u1]; cwperm[u1]=j;}
   for(i=0;i<10;i++) cwperm[i+26]=i;
   for(i=0;i<1000;i++) {u0=rand()%10+26; u1=rand()%10+26; j=cwperm[u0]; cwperm[u0]=cwperm[u1]; cwperm[u1]=j;}
-  }
-
-// tidy up square properties structure
-static void fixsp(struct sprop*sp) {
-  int k;
-
-  sp->bgcol&=0xffffff;
-  sp->fgcol&=0xffffff;
-  sp->mkcol&=0xffffff;
-//  if(sp->fstyle<0) sp->fstyle=0;
-  if(sp->fstyle>3) sp->fstyle=3;
-  sp->ten=!!sp->ten;
-//  if(sp->dech<0) sp->dech=0;
-  if(sp->dech>2) sp->dech=2;
-  sp->spor=!!sp->spor;
-  for(k=0;k<MAXNMK;k++) make7bitclean(sp->mk[k]);
-  }
-
-// tidy up light properties structure
-static void fixlp(struct lprop*lp) {
-  lp->dmask&=(1<<MAXNDICTS)-1;
-  lp->emask&=(1<<NLEM)-1;
-  if(lp->emask==0) lp->emask=EM_FWD;
-  lp->ten=!!lp->ten;
-  lp->lpor=!!lp->lpor;
-  lp->dnran=!!lp->dnran;
   }
 
 // FILE SAVE/LOAD
@@ -1488,10 +1389,9 @@ err:
 
 void accept_hints()
 {
-	int de,nd,f,i,j,x,y;
+	int de,nd,i,j,x,y;
 	ABM m;
 	struct entry *e;
-	ABM b;
 
 	for(x=0;x<width;x++) {
 		for(y=0;y<height;y++) {
@@ -1514,7 +1414,6 @@ void accept_hints()
 void print_grid()
 {
 	char ch;
-	int m, k;
 
 	int i, j;
 	for (j = 0; j < height; j++) {
@@ -1530,32 +1429,4 @@ void print_grid()
 		}
 		printf("\n");
 	}
-
-#if 0
-    else if(c==' ') {
-      m=e->flbm;k=cbits(m); // any info from filler?
-      DEB4 printf("%16llx ",m);
-      if(k==0) c='?'; // no feasible letters
-      else if(k==1) c=ltochar[logbase2(m)]; // unique feasible letter
-      else c=' ';
-      s[0]=c;s[1]=0;
-      setrgbcolor(cc,0.75,0.75,0.75);
-      mgcentre(&u,&v,x,y,md,l);
-      ctext(cc,s,u,v+0.3*sc,.7*sc,getfstyle(x,y),1);
-      if(k>1&&k<pxsq/2) { // more than one feasible letter
-        u=1.0/k*sc; // size of red square
-        setrgbcolor(cc,1,0,0);
-        movetomgcentre(cc,x,y,md,l);
-        rmoveto(cc,u/2.0,u/2.0);
-        rlineto(cc,0,-u);
-        rlineto(cc,-u,0);
-        rlineto(cc,0,u);
-        closepath(cc);
-        fill(cc);
-        }
-      }
-			}
-		}
-	}
-#endif
 }
