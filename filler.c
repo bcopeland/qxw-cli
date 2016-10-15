@@ -50,8 +50,6 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 #include "filler.h"
 #include "dicts.h"
 
-volatile int abort_flag = 0;
-
 // 0 = stopped, 1 = filling all, 2 = filling selection, 3 = word lists only (for preexport)
 static int fillmode;
 static clock_t ct0;
@@ -386,7 +384,6 @@ static int settleents(void) {
 	//  DEB1 printf("settleents() sdep = %d\n",sdep);
 	f = 0;
 	for(j = 0;j<nw;j++) {
-		if (abort_flag) return -3;
 		w = words+j;
 		if (w->lp->emask&EM_JUM) jmode = 1;
 		else if (w->lp->emask&EM_SPR) jmode = 2;
@@ -501,7 +498,6 @@ static int settlewds(void) {
 	//  DEB1 printf("settlewds()\n");
 	f = 0;
 	for(i = 0;i<nw;i++) {
-		if (abort_flag) return -3;
 		w = words+i;
 		if (!w->upd) continue; // loop over updated word lists
 		if (w->fe) continue;
@@ -631,7 +627,6 @@ static int mkscores(void) {
 
 	for(i = 0;i<ne;i++) for(j = 0;j<NL;j++) entries[i].score[j] = 1.0;
 	for(i = 0;i<nw;i++) {
-		if (abort_flag) return -3;
 		w = words+i;
 		if (w->fe) continue;
 		if (w->lp->emask&EM_JUM) jmode = 1;
@@ -825,11 +820,6 @@ static int buildlists(void) {int u,i,j;
 			checking[j] = words[i].e[j]->checking;
 		}
 		u = getinitflist(&words[i].flist,&words[i].flistlen,words[i].lp,words[i].wlen);
-		if (abort_flag) {
-			DEB1 printf("aborted while building word lists\n");
-			filler_status = -5;
-			return 1;
-		}
 		if (u) {filler_status = -3;return 0;}
 		if (words[i].lp->ten) clueorderindex++;
 		if (initjdata(i)) {filler_status = -3;return 0;}
@@ -861,7 +851,6 @@ static int search() {
 	if (settlewds() == -3) {DEB1 printf("aborting...\n"); return -5;};
 resettle: // "unit propagation"
 	do {
-		if (abort_flag) {DEB1 printf("aborting...\n"); return -5;}
 		f = settleents(); // rescan entries
 		if (f == -3) {DEB1 printf("aborting...\n"); return -5;}
 		if (f == 0) break;
@@ -908,18 +897,16 @@ static void searchdone() {
 	DEB1 printf("searchdone: A\n");
 	gdk_threads_enter();
 	DEB1 printf("searchdone: B\n");
-	if (abort_flag == 0) { // finishing gracefully?
-		if (filler_status == 2) {
-			mkfeas(); // construct feasible word list
-			DEB1 pstate(1);
-		}
-		else {
-			for(i = 0;i<ne;i++) entries[i].flbm = 0; // clear feasible letter bitmaps
-			llistp = NULL;llistn = 0; // no feasible word list
-			DEB1 printf("BG fill failed\n"),fflush(stdout);
-		}
-		// updatefeas();
+	if (filler_status == 2) {
+		mkfeas(); // construct feasible word list
+		DEB1 pstate(1);
 	}
+	else {
+		for(i = 0;i<ne;i++) entries[i].flbm = 0; // clear feasible letter bitmaps
+		llistp = NULL;llistn = 0; // no feasible word list
+		DEB1 printf("BG fill failed\n"),fflush(stdout);
+	}
+	// updatefeas();
 	updategrid();
 	gdk_threads_leave();
 	DEB1 printf("searchdone: C\n");

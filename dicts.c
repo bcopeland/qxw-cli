@@ -1098,7 +1098,6 @@ DEB2 {
       if(curten) u=treatans(ansp[curans]->ul);
       else       u=treatedanswer(ansp[curans]->ul);
       if(u) return u;
-      if(abort_flag) return -5;
       }
     for(i=0;i<NMSG;i++) if(curten&&treatorder[i]>0) {
       b=mfl[i]&~(ml[i]|(ml[i]-1)); // clear bits mf[] and below
