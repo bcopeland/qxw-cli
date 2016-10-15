@@ -36,17 +36,8 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 #include <ctype.h>
 #include <time.h>
 
-#ifdef _WIN32		// Additional includes for windows version 
-	#include <direct.h>
-	#include <shlobj.h>
-	#include <windows.h>
-	#define _USE_MATH_DEFINES
-  #define DIR_SEP_STR "\\"
-  #define DIR_SEP_CHAR '\\'
-#else
-  #define DIR_SEP_STR "/"
-  #define DIR_SEP_CHAR '/'
-#endif
+#define DIR_SEP_STR "/"
+#define DIR_SEP_CHAR '/'
 #include <math.h>
 
 #define RELEASE "20140331"

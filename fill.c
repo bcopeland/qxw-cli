@@ -1109,15 +1109,10 @@ void a_filenew(int flags) {
       }
     }
   if(!strcmp(filenamebase,"")) {   // brand new file
-#ifdef _WIN32
-    if(SHGetFolderPath(NULL, CSIDL_MYDOCUMENTS, NULL, 0, filenamebase)==S_OK) strcat(filenamebase,"\\");
-    else strcpy(filenamebase,"");
-#else
     struct passwd*pw;
     pw=getpwuid(getuid());
     if(!pw||strlen(pw->pw_dir)>SLEN-20) strcpy(filenamebase,"");
     else                                strcpy(filenamebase,pw->pw_dir),strcat(filenamebase,"/");;
-#endif
   } else { // we have a path to start from
     p=strrchr(filenamebase,DIR_SEP_CHAR);
     if(p) strcpy(p,DIR_SEP_STR);

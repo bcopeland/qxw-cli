@@ -31,30 +31,18 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 #include <pcre.h>
 #include <glib.h>   // required for string conversion functions
 
-#ifdef _WIN32  // using wrapper for Windows dynamic linking functions
-  #include "pfdlfcn.h"
-#else
-  #include <dlfcn.h>
-#endif
+#include <dlfcn.h>
 
 #include "common.h"
 #include "dicts.h"
 
 // default dictionaries
-#ifdef _WIN32
-  // Windows default dictionaries stored in subfolder of {app} folder
-  #define NDEFDICTS 1
-  char*defdictfn[NDEFDICTS]={
-    "\\Dictionaries\\UKACD18plus.txt"
-    };
-#else
-  #define NDEFDICTS 4
-  char*defdictfn[NDEFDICTS]={
-  "/usr/dict/words",
-  "/usr/share/dict/words",
-  "/usr/share/dict/british-english",
-  "/usr/share/dict/american-english"};
-#endif
+#define NDEFDICTS 4
+char*defdictfn[NDEFDICTS]={
+"/usr/dict/words",
+"/usr/share/dict/words",
+"/usr/share/dict/british-english",
+"/usr/share/dict/american-english"};
 
 // ISO-8859-1 character mapping to remove accents and fold case: #=reject word, .=ignore character for answer/light purposes
 static char chmap[256]="\
@@ -608,12 +596,7 @@ ew4:
 // !=0: nothing found
 int loaddefdicts() {int i;
   for(i=0;i<NDEFDICTS;i++) {
-    #ifdef _WIN32   // Set the default dictionary path as subpath of {app} path
-      GetCurrentDirectory(SLEN, dfnames[0]);
-      strcat(dfnames[0],defdictfn[i]);
-    #else
-      strcpy(dfnames[0],defdictfn[i]);
-    #endif
+    strcpy(dfnames[0],defdictfn[i]);
     strcpy(dsfilters[0],"^.*+(?<!'s)");
     loaddicts(1);
     if(atotal!=0) return 0; // happy if we found any words at all
