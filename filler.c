@@ -114,13 +114,6 @@ static void pstate(int f) {
 }
 
 
-// transfer progress info to display
-static void progress(void) {
-	gdk_threads_enter();
-	updategrid();
-	gdk_threads_leave();
-}
-
 static int initjdata(int j) {struct word*w; int i;
 	w = words+j;
 	if (!(w->lp->emask&EM_JUM)) return 0;
@@ -883,7 +876,11 @@ nextposs:
 	state_push();
 	entries[e].upd = 1;
 	entries[e].flbm = chartoabm[(int)c]; // fix feasible list
-	ct1 = clock(); if (ct1-ct0>CLOCKS_PER_SEC*3||ct1-ct0<0) {progress();ct0 = clock();} // update display every three seconds or so
+	ct1 = clock();
+	if (ct1-ct0>CLOCKS_PER_SEC*3 || ct1-ct0<0) {
+		update_grid();
+		ct0 = clock();
+	} // update display every three seconds or so
 	goto resettle; // update internal data from new entry
 
 backtrack:
@@ -907,7 +904,7 @@ static void searchdone() {
 		DEB1 printf("BG fill failed\n"),fflush(stdout);
 	}
 	// updatefeas();
-	updategrid();
+	update_grid();
 	gdk_threads_leave();
 	DEB1 printf("searchdone: C\n");
 	state_finit();

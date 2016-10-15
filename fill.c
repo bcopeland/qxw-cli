@@ -1241,9 +1241,12 @@ void mkfeas(void) {int l,x,y; int*p; struct word*w=0;
   }
 
 // provide progress info to display
-void updategrid(void) {int i;
-  for(i=0;i<ne;i++) entries[i].flbmh=entries[i].flbm; // make back-up copy of hints
-  }
+void update_grid(void)
+{
+	int i;
+	for (i = 0; i < ne; i++)
+		entries[i].flbmh=entries[i].flbm; // make back-up copy of hints
+}
 
 int read_grid(FILE *fp)
 {
