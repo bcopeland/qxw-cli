@@ -50,8 +50,6 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 #include "filler.h"
 #include "dicts.h"
 
-static GThread *fth;
-
 volatile int abort_flag = 0;
 
 // 0 = stopped, 1 = filling all, 2 = filling selection, 3 = word lists only (for preexport)
@@ -968,7 +966,6 @@ int filler_init(int mode)
 {
 	int i;
 
-	assert(fth == 0);
 	DEB1 printf("filler_start(%d)\n",mode);
 	DEB1 pstate(0);
 
