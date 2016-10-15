@@ -933,84 +933,6 @@ case 3: case 4:
 
 int prefdata[NPREFS]={0,0,0,66,75, 1,0,36,36,0};
 
-static char*prefname[NPREFS]={ // names as used in preferences file
-  "edit_click_for_block", "edit_click_for_bar", "edit_show_numbers",
-  "stats_min_check_percent", "stats_max_check_percent",
-  "autofill_no_duplicates", "autofill_random",
-  "export_EPS_square_points","export_HTML_square_pixels",
-  "light_numbers_in_solutions" };
-
-static int prefminv[NPREFS]={0,0,0,0,0,0,0,10,10,0}; // legal range
-static int prefmaxv[NPREFS]={1,1,1,100,100,1,2,72,72,1};
-
-// read preferences from file
-// fail silently
-static void loadprefs(void) {FILE*fp;
-  char s[SLEN],t[SLEN];
-  int i,u;
-  
-	#ifdef _WIN32		// Folder for preferences file
-		if(SUCCEEDED(SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0, s))) {
-			strcat(s,"\\Qxw\\Qxw.ini"); 
-			}
-		else return;
-	#else
-		struct passwd*p;
-		p=getpwuid(getuid());
-		if(!p) return;
-		if(strlen(p->pw_dir)>SLEN-20) return;
-		strcpy(s,p->pw_dir);
-		strcat(s,"/.qxw/preferences");
-  #endif
-
-  DEB1 printf("loadprefs %s\n",s);
-  fp=fopen(s,"r");if(!fp) return;
-  while(fgets(s,SLEN,fp)) {
-    if(sscanf(s,"%s %d",t,&u)==2) {
-      for(i=0;i<NPREFS;i++)
-        if(!strcmp(t,prefname[i])) {
-          if(u<prefminv[i]) u=prefminv[i];
-          if(u>prefmaxv[i]) u=prefmaxv[i];
-          prefdata[i]=u;
-          }
-      }
-    }
-  fclose(fp);
-  }
-
-// write preferences to file
-// fail silently
-void saveprefs(void) {FILE*fp;
-  int i;
-  char s[SLEN];
-  
-	#ifdef _WIN32		// Preferences in app data folder
-		if(SUCCEEDED(SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0, s))) {
-			strcat(s,"\\Qxw"); 
-			_mkdir(s);   
-			strcat(s,"\\Qxw.ini"); 
-		  }
-		else return;
-	#else
-		struct passwd*p;
-		p=getpwuid(getuid());
-		if(!p) return;
-		if(strlen(p->pw_dir)>SLEN-20) return;
-		strcpy(s,p->pw_dir);
-		strcat(s,"/.qxw");
-		mkdir(s,0777);
-		strcat(s,"/preferences");
-	#endif
-
-  DEB1 printf("saveprefs %s\n",s);
-  fp=fopen(s,"w");if(!fp) return;
-  for(i=0;i<NPREFS;i++) if(fprintf(fp,"%s %d\n",prefname[i],prefdata[i])<0) break;
-  fclose(fp);
-  }
-
-
-
-
 static char*defaultmk(int k) {return k?"":"\\#";} // default mark is just number in NW corner
 
 void make7bitclean(char*s) {
@@ -1263,7 +1185,6 @@ ew0:
 
 
 	a_filenew(0); // reset grid
-	loadprefs(); // load preferences file (silently failing to defaults)
 	nd = 1;
 	strcpy(dfnames[0], "all_dict");
 	loaddicts(0);
