@@ -350,43 +350,58 @@ static int settleents(void)
 
 // check updated word lists, rebuild feasible entry lists
 // returns -3 for aborted, 0 if no feasible letter lists affected, >0 otherwise
-static int settlewds(void) {
-	int f,i,j,k,l,m,jmode;
-	int*p;
-	struct entry*e;
-	struct word*w;
+static int settlewds(void)
+{
+	int f, i, j, k, l, m, jmode;
+	int *p;
+	struct entry *e;
+	struct word *w;
 	ABM entfl[MXFL];
 	//  DEB1 printf("settlewds()\n");
 	f = 0;
-	for(i = 0;i<nw;i++) {
-		w = words+i;
-		if (!w->upd) continue; // loop over updated word lists
-		if (w->fe) continue;
-		if (w->lp->emask&EM_SPR) jmode = 2;
-		else                         jmode = 0;
+	for (i = 0; i < nw; i++) {
+		w = words + i;
+		if (!w->upd)
+			continue;	// loop over updated word lists
+		if (w->fe)
+			continue;
+		if (w->lp->emask & EM_SPR)
+			jmode = 2;
+		else
+			jmode = 0;
 		m = w->nent;
 		p = w->flist;
 		l = w->flistlen;
 
-		for(k = 0;k<m;k++) entfl[k] = 0;
-		if (jmode == 0) for(j = 0;j<l;j++) for(k = 0;k<m;k++) entfl[k] |= chartoabm[(int)lts[p[j]].s[k]]; // find all feasible letters from word list
-		else if (jmode == 2) for(j = 0;j<l;j++) for(k = 0;k<m;k++) entfl[k] |= w->sdata[j].flbm[k]; // main work has been done in settleents()
+		for (k = 0; k < m; k++)
+			entfl[k] = 0;
+		if (jmode == 0)
+			for (j = 0; j < l; j++)
+				for (k = 0; k < m; k++)
+					entfl[k] |= chartoabm[(int)lts[p[j]].s[k]];	// find all feasible letters from word list
+		else if (jmode == 2)
+			for (j = 0; j < l; j++)
+				for (k = 0; k < m; k++)
+					entfl[k] |= w->sdata[j].flbm[k];	// main work has been done in settleents()
 
 		DEB16 {
-			printf("w = %d entfl: ",i);
-			for(k = 0;k<m;k++) printf(" %016llx",entfl[k]);
+			printf("w = %d entfl: ", i);
+			for (k = 0; k < m; k++)
+				printf(" %016llx", entfl[k]);
 			printf("\n");
 		}
-		for(j = 0;j<m;j++) {
-			e = w->e[j]; // propagate from word to entry
-			if (e->flbm&~entfl[j]) { // has this entry been changed by the additional constraint?
+		for (j = 0; j < m; j++) {
+			e = w->e[j];	// propagate from word to entry
+			if (e->flbm & ~entfl[j]) {	// has this entry been changed by the additional constraint?
 				e->flbm &= entfl[j];
-				e->upd = 1;f++; // flag that it will need updating
+				e->upd = 1;
+				f++;	// flag that it will need updating
 				//      printf("E%d %16llx\n",k,entries[k].flbm);fflush(stdout);
 			}
 		}
 	}
-	for(i = 0;i<nw;i++) words[i].upd = 0; // all word list updates processed
+	for (i = 0; i < nw; i++)
+		words[i].upd = 0;	// all word list updates processed
 	//  DEB1 printf("settlewds returns %d\n",f);fflush(stdout);
 	return f;
 }
