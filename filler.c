@@ -120,40 +120,6 @@ static int initsdata(int j) {struct word*w; int i,k;
 	return 0;
 }
 
-// Determine if one string is a non-trivial cyclic permutation of another
-static int strcyccmp(char*s,char*t,int l) {
-	int i,j,k;
-
-	for(i = 1;i<l;i++) { // cyclic shift amount
-		for(j = 0,k = i;j<l;j++,k++) {
-			if (k == l) k = 0;
-			if (s[j] !=  t[k]) goto ex0;
-		}
-		return 1;
-ex0:;
-	}
-	return 0;
-}
-
-// Check that jumble is not a disallowed permutation
-// mode = 0: use entry flbm:s; 1: use jdata flbm:s
-static int checkperm(struct word*w,int j,int mode) {
-	int em,k,m;
-	char f[MXFL+1],r[MXFL+1],*t;
-
-	em = w->lp->emask;
-	m = w->jlen;
-	for(k = 0;k<m;k++) f[k] = r[m-1-k] = ltochar[logbase2(w->e[k]->flbm)];
-	f[k] = 0; r[k] = 0;
-	t = lts[w->flist[j]].s;
-	DEB16 printf("checkperm(%s : %s em = %d mode = %d)\n",f,t,em,mode);
-	if ((em&EM_FWD) == 0) if (!strncmp(f,t,m)) return 0;
-	if ((em&EM_REV) == 0) if (!strncmp(r,t,m)) return 0;
-	if ((em&EM_CYC) == 0) if (strcyccmp(f,t,m)) return 0;
-	if ((em&EM_RCY) == 0) if (strcyccmp(r,t,m)) return 0;
-	return 1;
-}
-
 // Calculate number of possible spreads that put each possible letter in each position
 // given implications of flbm:s.
 static void scounts(struct word*w,int wn,ABM*bm) {
@@ -365,14 +331,6 @@ static int settleents(void)
 			return -2;	// no options left and was not fully entered by user
 		if (!aed)
 			continue;	// not all entries determined yet, so don't commit
-		if (jmode == 1) {	// final check that the "jumble" is not actually a cyclic permutation etc.
-			for (i = 0, k = 0; i < l; i++) {
-				w->flist[k] = w->flist[i];
-				if (checkperm(w, k, 0))
-					k++;
-			}
-			l = k;
-		}
 		w->flistlen = l;
 		if (l == 0 && !w->fe)
 			return -2;	// no options left and was not fully entered by user
@@ -391,7 +349,7 @@ static int settleents(void)
 // check updated word lists, rebuild feasible entry lists
 // returns -3 for aborted, 0 if no feasible letter lists affected, >0 otherwise
 static int settlewds(void) {
-	int f,i,j,k,l,m,mj,jmode;
+	int f,i,j,k,l,m,jmode;
 	int*p;
 	struct entry*e;
 	struct word*w;
@@ -405,7 +363,6 @@ static int settlewds(void) {
 		if (w->lp->emask&EM_SPR) jmode = 2;
 		else                         jmode = 0;
 		m = w->nent;
-		mj = w->jlen;
 		p = w->flist;
 		l = w->flistlen;
 
