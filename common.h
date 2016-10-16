@@ -283,6 +283,9 @@ extern int prefdata[NPREFS];
 #define UNDOS 50
 
 void update_grid(void);
+void mkfeas(void);
+char abmtoechar(ABM b);
+void reperr(const char *s);
 
 static inline int logbase2(int i)
 {
