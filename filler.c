@@ -45,7 +45,6 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include <glib.h>
 #include <gdk/gdk.h>
-#include <time.h>
 #include "common.h"
 #include "filler.h"
 #include "dicts.h"
@@ -53,7 +52,6 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 
 // 0 = stopped, 1 = filling all, 2 = filling selection, 3 = word lists only (for preexport)
 static int fillmode;
-static clock_t ct0;
 
 // return code: -5: aborted; -3, -4: initflist errors; -2: out of stack; -1: out of memory; 0: stopped; 1: no fill found; 2: fill found; 3: running
 int filler_status;
@@ -459,7 +457,6 @@ static int buildlists(void) {int u,i,j;
 static int search() {
 	int e,f;
 	char c;
-	clock_t ct1;
 
 	// Initially entry flbms are not consistent with word lists or vice versa. So we
 	// need to make sure we call both settlewds() and settleents() before proceeding.
@@ -498,11 +495,6 @@ nextposs:
 	state_push();
 	entries[e].upd = 1;
 	entries[e].flbm = chartoabm[(int)c]; // fix feasible list
-	ct1 = clock();
-	if (ct1-ct0>CLOCKS_PER_SEC*3 || ct1-ct0<0) {
-		update_grid();
-		ct0 = clock();
-	} // update display every three seconds or so
 	goto resettle; // update internal data from new entry
 
 backtrack:
@@ -541,9 +533,7 @@ static void searchdone() {
 int filler_search()
 {
 	int i;
-	clock_t ct;
 
-	ct = ct0 = clock();
 	clueorderindex = 0;
 	if (buildlists())
 		goto ex0;
@@ -557,8 +547,6 @@ int filler_search()
 	filler_status = search();
 	if (fillmode != 3)
 		searchdone(); // tidy up unless in pre-export mode
-
-	DEB1 printf("search finished: %.3fs\n",(double)(clock()-ct)/CLOCKS_PER_SEC);
 
 ex0:
 	DEB1 printf("fillerthread() terminating filler_status = %d\n",filler_status);
