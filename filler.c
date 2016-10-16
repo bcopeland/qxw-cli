@@ -219,9 +219,6 @@ static int settleents(void)
 			return -2;	// no options left and was not fully entered by user
 		if (!aed)
 			continue;	// not all entries determined yet, so don't commit
-		w->flistlen = l;
-		if (l == 0 && !w->fe)
-			return -2;	// no options left and was not fully entered by user
 		assert(w->commitdep == -1);
 		for (k = 0; k < l; k++)
 			setused(w->flist[k], 1);	// flag as used (can be more than one in jumble case)
