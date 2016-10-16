@@ -105,17 +105,9 @@ int dvflip[NGTYPE][MAXNDIR*2]={
 void reperr(const char*s) {
 	printf("%s\n", s);
 }
-static unsigned char log2lut[65536];
 
 int cbits(ABM x) {ABM i; int j; for(i=1,j=0;i<ABM_ALL;i+=i) if(x&i) j++; return j;} // count set bits
 int onebit(ABM x) {return x!=0&&(x&(x-1))==0;}
-int logbase2(ABM x) {int u;    // find lowest set bit
-  u= x     &0xffff; if(u) return log2lut[u];
-  u=(x>>16)&0xffff; if(u) return log2lut[u]+16;
-  u=(x>>32)&0xffff; if(u) return log2lut[u]+32;
-  u=(x>>48)&0xffff; if(u) return log2lut[u]+48;
-  return -1;
-  }
 
 int*llistp=0;    // ptr to matching lights
 int llistn=0;    // number of matching lights
@@ -1134,7 +1126,6 @@ int main(int argc,char*argv[]) {
 	for(i=0;i<26;i++) ltochar[i]   =i+'A',chartol[i   +'A']=i,chartol[i+'a']=i,chartoabm[i   +'A']=1ULL<<i,chartoabm[i+'a']=1ULL<<i;
 	for(i=0;i<10;i++) ltochar[i+26]=i+'0',chartol[i   +'0']=i+26              ,chartoabm[i   +'0']=1ULL<<(i+26);
 	ltochar[36]  =  '-',chartol[(int)'-']=36                ,chartoabm[(int)'-']=1ULL<<36;
-	log2lut[0]=log2lut[1]=0; for(i=2;i<65536;i+=2) { log2lut[i]=log2lut[i/2]+1; log2lut[i+1]=0; }
 	resetstate();
 	for(i=0;i<MAXNDICTS;i++) dfnames[i][0]='\0';
 	for(i=0;i<MAXNDICTS;i++) strcpy(dsfilters[i],"");

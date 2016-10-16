@@ -284,4 +284,9 @@ extern int prefdata[NPREFS];
 
 void update_grid(void);
 
+static inline int logbase2(int i)
+{
+	return ffs(i) - 1;
+}
+
 #endif
