@@ -63,8 +63,6 @@ static int sdep = -1; // stack pointer
 static char **sposs;               // possibilities for this entry, 0-terminated
 static int *spossp;                // which possibility we are currently trying (index into sposs)
 static int ***sflist;              // pointers to restore feasible word list flist
-static struct jdata ***sjdata;     // jumble data
-static ABM ***sjflbm;              // jumble data feasible list bitmaps
 static struct sdata ***ssdata;     // spread data
 static int **sflistlen;            // pointers to restore flistlen
 static ABM **sentryfl;             // feasible letter bitmap for this entry
@@ -87,8 +85,7 @@ static void pstate(int f) {
 
 	for(i = 0;i<nw;i++) {
 		w = words+i;
-		if (w->lp->emask&EM_JUM) jmode = 1;
-		else if (w->lp->emask&EM_SPR) jmode = 2;
+		if (w->lp->emask&EM_SPR) jmode = 2;
 		else                         jmode = 0;
 		printf("W%d: fe = %d jmode = %d nent = %d wlen = %d jlen = %d ",i,w->fe,jmode,w->nent,w->wlen,w->jlen);
 		for(j = 0;j<w->nent;j++) {
@@ -111,19 +108,6 @@ static void pstate(int f) {
 			printf(" (%d)\n",w->flistlen);
 		}
 	}
-}
-
-
-static int initjdata(int j) {struct word*w; int i;
-	w = words+j;
-	if (!(w->lp->emask&EM_JUM)) return 0;
-	if (w->fe) return 0;
-	w->jdata = malloc(w->flistlen*sizeof(struct jdata));
-	if (!w->jdata) return -1;
-	w->jflbm = malloc(w->flistlen*w->jlen*sizeof(ABM));
-	if (!w->jflbm) return -1;
-	for(i = 0;i<w->flistlen*w->jlen;i++) w->jflbm[i] = ABM_ALL;
-	return 0;
 }
 
 static int initsdata(int j) {struct word*w; int i,k;
@@ -159,7 +143,7 @@ static int checkperm(struct word*w,int j,int mode) {
 
 	em = w->lp->emask;
 	m = w->jlen;
-	for(k = 0;k<m;k++) f[k] = r[m-1-k] = ltochar[logbase2(mode?w->jflbm[j*m+k]:w->e[k]->flbm)];
+	for(k = 0;k<m;k++) f[k] = r[m-1-k] = ltochar[logbase2(w->e[k]->flbm)];
 	f[k] = 0; r[k] = 0;
 	t = lts[w->flist[j]].s;
 	DEB16 printf("checkperm(%s : %s em = %d mode = %d)\n",f,t,em,mode);
@@ -167,88 +151,6 @@ static int checkperm(struct word*w,int j,int mode) {
 	if ((em&EM_REV) == 0) if (!strncmp(r,t,m)) return 0;
 	if ((em&EM_CYC) == 0) if (strcyccmp(f,t,m)) return 0;
 	if ((em&EM_RCY) == 0) if (strcyccmp(r,t,m)) return 0;
-	return 1;
-}
-
-// Approximate test to see if a jumbled string can fit in a given word. Writes deductions to flbm etc. in jdata.
-static int checkjword(struct word*w,int j) {
-	unsigned char hi[NL];
-	ABM bm[MXFL],u,v,*jbm;
-	struct light*l;
-	int c,c0,c1,f,i,k,m,n,nuf;
-
-	l = lts+w->flist[j];
-	m = w->jlen;
-	jbm = w->jflbm+j*m;
-	//  if (w-words == 0) debug |= 16; else debug &= ~16;
-	DEB16 {
-		printf("checkjword(w = %ld,\"%s\") m = %d lbm = %016llx\n",(long int)(w-words),l->s,m,l->lbm);
-		printf("hist:"); for(i = 0;i<NL;i++) printf(" %d",l->hist[i]); printf("\n");
-		printf("order:"); for(i = 0;i<l->nhistorder;i++) printf(" %d",l->historder[i]); printf("\n");
-	}
-	for(k = 0;k<m;k++) bm[k] = w->e[k]->flbm&l->lbm;
-	do {
-		DEB16 { printf("** "); for(k = 0;k<m;k++) printf("%016llx ",bm[k]); printf("\n"); }
-		f = 0;
-		memcpy(hi,l->hist,sizeof(hi));
-		for(k = 0;k<m;k++) {
-			u = bm[k];
-			if (!u) {DEB16 printf("empty bitmap\n"); return 0;} // infeasible
-			if (onebit(u)) { // entry is forced
-				c = logbase2(u);
-				if (hi[c]-- == 0) {DEB16 printf("not enough in histogram for forced entries\n"); return 0;}
-			}
-		}
-
-		for(u = 0,n = 0,nuf = 0,i = 0;i<l->nhistorder;i++) { // work from biggest histogram entry down, greedily looking for contradictions
-			c = l->historder[i];
-			n += hi[c];   // accumulate histogram total of letters considered so far in this group
-			nuf += hi[c];
-			v = 1ULL<<c;
-			u |= v;       // accumulate bitmap of letters considered so far
-			for(c0 = 0,c1 = 0,k = 0;k<m;k++) {
-				if (onebit(bm[k])) continue; // these already taken off histogram
-				if (bm[k]&v) c0++; // count places where this letter can go
-				if (bm[k]&u) c1++; // count places where letters in this group can go
-			}
-			DEB16 { for(k = 0;k<m;k++) printf("%016llx ",bm[k]); printf("\n"); }
-			DEB16 printf("  c = %d n = %d nuf = %d u = %016llx v = %016llx c0 = %d c1 = %d\n",c,n,nuf,u,v,c0,c1);
-			if (c0< hi[c]) {DEB16 printf("not enough slots for char %d\n",c); return 0;}
-			if (c0 == hi[c]) { // only just enough slots to go round for this letter
-				for(k = 0;k<m;k++) if (bm[k]&v) {if (bm[k]&~v) {f = 1; bm[k] = v; n--;}}
-				// At this point we may have newly-created "onebit" entries in bm[k], making it out of sync with hi[c].
-				// However, we do not consider c again until the next time round the do loop, by which time hi[c] will have
-				// been recalculated.
-			}
-			if (c1< n) {DEB16 printf("not enough slots for group %016llx: slot count = %d group count = %d\n",u,c1,n); return 0;}
-			if (c1 == n) { // only just enough slots to go round for this group
-				for(k = 0;k<m;k++) if (bm[k]&u) {if (bm[k]&~u) f = 1; bm[k] &= u;}
-				DEB16 printf("new group\n");
-				n = 0; // start a new group
-				v = 0;
-				// Again we may have newly-created "onebit" entries in bm[k], making it out of sync with hi[c].
-				// However, we do not consider any member of the set u again until the next time round the do loop.
-			}
-			w->jdata[j].nuf = nuf;
-			w->jdata[j].ufhist[i] = hi[c];
-			w->jdata[j].poscnt[i] = c0;
-		}
-	} while(f);
-	memcpy(jbm,bm,m*sizeof(ABM));
-	DEB16 {
-		printf("checkjword returning: w = %ld \"%s\" nuf = %d hist(poscnt) = ",(long int)(w-words),l->s,nuf);
-		for(i = 0;i<l->nhistorder;i++) printf("%d(%d) ",w->jdata[j].ufhist[i],w->jdata[j].poscnt[i]);
-		printf(" flbm:");
-		for(i = 0;i<m;i++) printf(" %016llx",jbm[i]);
-		printf("\n");
-	}
-	for(i = 0;i<m;i++) if (!onebit(jbm[i])) break;
-	if (i == m) { // all entries are forced
-		i = checkperm(w,j,1);
-		DEB16 printf("checkperm returns %d\n",i);
-		if (i == 0) return 0;
-	}
-	DEB16 printf("checkjword: OK\n");
 	return 1;
 }
 
@@ -372,24 +274,19 @@ static int settleents(void)
 {
 	struct entry *e;
 	struct word *w;
-	struct jdata *jd;
 	struct sdata *sd;
-	ABM *jdf;
-	int aed, f, i, j, k, l, m, mj, jmode;
+	int aed, f, i, j, k, l, m, jmode;
 	int *p;
 
 	f = 0;
 	for (j = 0; j < nw; j++) {
 		w = words + j;
-		if (w->lp->emask & EM_JUM)
-			jmode = 1;
-		else if (w->lp->emask & EM_SPR)
+		if (w->lp->emask & EM_SPR)
 			jmode = 2;
 		else
 			jmode = 0;
 		//    printf("j = %d jmode = %d emask = %d\n",j,jmode,w->lp->emask);
 		m = w->nent;
-		mj = w->jlen;
 		for (k = 0; k < m; k++)
 			if (w->e[k]->upd)
 				break;
@@ -401,31 +298,15 @@ static int settleents(void)
 		aed = (k == m);	// all entries determined?
 		p = w->flist;
 		l = w->flistlen;
-		jd = w->jdata;
 		sd = w->sdata;
 		if (sflistlen[sdep][j] == -1) {	// then we mustn't trash words[].flist
 			sflist[sdep][j] = p;
 			sflistlen[sdep][j] = l;
-			sjdata[sdep][j] = jd;
-			sjflbm[sdep][j] = w->jflbm;
 			ssdata[sdep][j] = sd;
-			w->jdata = 0;
-			w->jflbm = 0;
 			w->sdata = 0;
 			w->flist = (int *)malloc(l * sizeof(int));	// new list can be at most as long as old one
 			if (!w->flist)
 				return -1;	// out of memory
-			if (jmode == 1) {
-				w->jdata =
-				    (struct jdata *)malloc(l *
-							   sizeof(struct
-								  jdata));
-				if (!w->jdata)
-					return -1;	// out of memory
-				w->jflbm = (ABM *) malloc(l * mj * sizeof(ABM));
-				if (!w->jflbm)
-					return -1;	// out of memory
-			}
 			if (jmode == 2) {
 				w->sdata =
 				    (struct sdata *)malloc(l *
@@ -453,22 +334,6 @@ static int settleents(void)
 				if (l == 0)
 					break;
 			}
-		} else if (jmode == 1) {	// jumble case
-			for (k = mj; k < m; k++) {	// loop over tags if any
-				e = w->e[k];
-				if (!e->upd)
-					continue;
-				l = listisect(w->flist, p, l, k, e->flbm);	// generate new feasible word list
-				p = w->flist;
-			}
-			for (i = 0, k = 0; i < l; i++) {
-				w->flist[k] = p[i];
-				if (checkjword(w, k))
-					k++;
-			}
-			l = k;
-			w->upd = 1;
-			f++;	// need to do settlents() anyway in this case
 		} else {	// spread case
 			for (i = 0, k = 0; i < l; i++) {
 				w->flist[k] = p[i];
@@ -487,17 +352,6 @@ static int settleents(void)
 				p = realloc(w->flist, l * sizeof(int));
 				if (p)
 					w->flist = p;
-				if (w->jdata) {
-					jd = realloc(w->jdata,
-						     l * sizeof(struct jdata));
-					if (jd)
-						w->jdata = jd;
-					jdf =
-					    realloc(w->jflbm,
-						    l * mj * sizeof(ABM));
-					if (jdf)
-						w->jflbm = jdf;
-				}
 				if (w->sdata) {
 					sd = realloc(w->sdata,
 						     l * sizeof(struct sdata));
@@ -548,8 +402,7 @@ static int settlewds(void) {
 		w = words+i;
 		if (!w->upd) continue; // loop over updated word lists
 		if (w->fe) continue;
-		if (w->lp->emask&EM_JUM) jmode = 1;
-		else if (w->lp->emask&EM_SPR) jmode = 2;
+		if (w->lp->emask&EM_SPR) jmode = 2;
 		else                         jmode = 0;
 		m = w->nent;
 		mj = w->jlen;
@@ -558,10 +411,6 @@ static int settlewds(void) {
 
 		for(k = 0;k<m;k++) entfl[k] = 0;
 		if (jmode == 0) for(j = 0;j<l;j++) for(k = 0;k<m;k++) entfl[k] |= chartoabm[(int)lts[p[j]].s[k]]; // find all feasible letters from word list
-		else if (jmode == 1) for(j = 0;j<l;j++) {
-			for(k = 0;k<mj;k++) entfl[k] |= w->jflbm[j*mj+k]; // main work has been done in settleents()
-			for(   ;k<m ;k++) entfl[k] |= chartoabm[(int)lts[p[j]].s[k]];
-		}
 		else if (jmode == 2) for(j = 0;j<l;j++) for(k = 0;k<m;k++) entfl[k] |= w->sdata[j].flbm[k]; // main work has been done in settleents()
 
 		DEB16 {
@@ -582,64 +431,6 @@ static int settlewds(void) {
 	//  DEB1 printf("settlewds returns %d\n",f);fflush(stdout);
 	return f;
 }
-
-// Very approximate attempt to estimate number of possible jumbles that put each possible letter in each position
-// given implications of flbm:s.
-// Returns equally poor estimate of total number of permutations.
-static double jscores(struct word*w,int j,double(*sc)[NL]) {
-	struct jdata*jd;
-	struct light*l;
-	int c,h,i,k,m,nuf,p,t;
-	double r,s;
-	double tp;
-	ABM u,*jbm;
-
-	l = lts+w->flist[j];
-	m = w->jlen;
-	jd = w->jdata+j;
-	jbm = w->jflbm+j*m;
-	nuf = jd->nuf;
-	DEB16 {
-		printf("jscores: w = %ld \"%s\" nuf = %d hist(poscnt) = ",(long int)(w-words),l->s,nuf);
-		for(i = 0;i<l->nhistorder;i++) printf("%d(%d) ",jd->ufhist[i],jd->poscnt[i]);
-	}
-	// first make a very poor man's estimate of total feasible permutations given jdata information for word
-	t = nuf;
-	tp = 1;
-	for(i = 0;i<l->nhistorder;i++) {
-		h = jd->ufhist[i]; p = jd->poscnt[i];
-		if (!h||h == nuf) continue;
-		r = (double)(p-h)/(nuf-h)*(t-h)+h; // if p == h, r = h; if p == nuf, r = t; and linearly (!) in between
-		for(k = 1;k <= h;k++) tp *= r,tp /= k,r -= 1;
-		t -= h;
-	}
-	DEB16 {
-		printf("  tp == %g\n",tp);
-		printf("  flbm:"); for(k = 0;k<m;k++) printf(" %016llx",jbm[k]); printf("\n");
-	}
-	memset(sc,0,m*NL*sizeof(double));
-	for(k = 0;k<m;k++) {
-		u = jbm[k];
-		if (u == 0) continue;
-		if (onebit(u)) sc[k][logbase2(u)] = tp; // forced entry
-		else {
-			for(r = 0,i = 0;i<l->nhistorder;i++) {
-				c = l->historder[i];
-				if (jd->poscnt[i] == 0) continue;
-				if (u&(1ULL<<c)) {
-					s = (double)jd->ufhist[i]/jd->poscnt[i]; // proportion of fills that will have letter c in each position
-					r += sc[k][c] = s;
-				}
-			}
-			if (r>0) r = tp/r;
-			for(i = 0;i<NL;i++) sc[k][i] *= r;
-		}
-		DEB16 {       printf("  e%d:",k); for(i = 0;i<26;i++) printf(" %5.1f",sc[k][i]); printf("\n"); }
-	}
-	return tp;
-}
-
-
 
 // calculate scores for spread entry
 static void sscores(struct word*w,int wn,double(*sc)[NL]) {
@@ -665,7 +456,7 @@ static void sscores(struct word*w,int wn,double(*sc)[NL]) {
 // calculate per-entry scores
 // returns -3 if aborted
 static int mkscores(void) {
-	int c,i,j,k,l,m,mj,jmode;
+	int c,i,j,k,l,m,jmode;
 	int*p;
 	double f;
 	struct word*w;
@@ -676,11 +467,9 @@ static int mkscores(void) {
 	for(i = 0;i<nw;i++) {
 		w = words+i;
 		if (w->fe) continue;
-		if (w->lp->emask&EM_JUM) jmode = 1;
-		else if (w->lp->emask&EM_SPR) jmode = 2;
+		if (w->lp->emask&EM_SPR) jmode = 2;
 		else                         jmode = 0;
 		m = w->nent;
-		mj = w->jlen;
 		p = w->flist;
 		l = w->flistlen;
 		for(k = 0;k<m;k++) for(j = 0;j<NL;j++) sc[k][j] = 0.0;
@@ -695,14 +484,6 @@ static int mkscores(void) {
 					else f = (double)ansp[lts[p[j]].ans]->score;
 					for(k = 0;k<m;k++) sc[k][chartol[(int)lts[p[j]].s[k]]] += f; // add in its score to this cell's score
 				}
-			}
-		} else if (jmode == 1) { // jumble case
-			for(j = 0;j<l;j++) {
-				f = jscores(w,j,tsc);
-				for(k = 0;k<mj;k++) for(c = 0;c<NL;c++) sc[k][c] += tsc[k][c];
-				k = lts[p[j]].ans;
-				if (k >= 0) f *= (double)ansp[k]->score; // score once for each feasible permutation; assume score = 1 if a treatment light
-				for(k = mj;k<m;k++) sc[k][chartol[(int)lts[p[j]].s[k]]] += f;
 			}
 		} else { // spread case
 			for(j = 0;j<l;j++) {
@@ -749,8 +530,6 @@ static void freestack() {int i;
 	for(i = 0;i <= ne;i++) {
 		if (sposs     ) FREEX(sposs     [i]);
 		if (sflist    ) FREEX(sflist    [i]);
-		if (sjdata    ) FREEX(sjdata    [i]);
-		if (sjflbm    ) FREEX(sjflbm    [i]);
 		if (ssdata    ) FREEX(ssdata    [i]);
 		if (sflistlen ) FREEX(sflistlen [i]);
 		if (sentryfl  ) FREEX(sentryfl  [i]);
@@ -758,8 +537,6 @@ static void freestack() {int i;
 	FREEX(sposs);
 	FREEX(spossp);
 	FREEX(sflist);
-	FREEX(sjdata);
-	FREEX(sjflbm);
 	FREEX(ssdata);
 	FREEX(sflistlen);
 	FREEX(sentryfl);
@@ -771,8 +548,6 @@ static int allocstack() {int i;
 	if (!(sposs     =calloc(ne+1,sizeof(char*         )))) return 1;
 	if (!(spossp    =calloc(ne+1,sizeof(int           )))) return 1;
 	if (!(sflist    =calloc(ne+1,sizeof(int**         )))) return 1;
-	if (!(sjdata    =calloc(ne+1,sizeof(struct jdata**)))) return 1;
-	if (!(sjflbm    =calloc(ne+1,sizeof(ABM**         )))) return 1;
 	if (!(ssdata    =calloc(ne+1,sizeof(struct sdata**)))) return 1;
 	if (!(sflistlen =calloc(ne+1,sizeof(int*          )))) return 1;
 	if (!(sentryfl  =calloc(ne+1,sizeof(ABM*          )))) return 1;
@@ -780,8 +555,6 @@ static int allocstack() {int i;
 	for(i = 0;i <= ne;i++) { // for each stack depth that can be reached
 		if (!(sposs     [i] = malloc(NL+1                    ))) return 1;
 		if (!(sflist    [i] = malloc(nw*sizeof(int*         )))) return 1;
-		if (!(sjdata    [i] = malloc(nw*sizeof(struct jdata*)))) return 1;
-		if (!(sjflbm    [i] = malloc(nw*sizeof(ABM*         )))) return 1;
 		if (!(ssdata    [i] = malloc(nw*sizeof(struct sdata*)))) return 1;
 		if (!(sflistlen [i] = malloc(nw*sizeof(int          )))) return 1;
 		if (!(sentryfl  [i] = malloc(ne*sizeof(ABM          )))) return 1;
@@ -821,14 +594,6 @@ static void state_restore(void) {int i,j,l; struct word*w;
 			free(w->flist);
 			w->flist = sflist[sdep][i];
 			w->flistlen = sflistlen[sdep][i];
-			if (w->jdata) {
-				free(w->jdata);
-				w->jdata = sjdata[sdep][i];
-			}
-			if (w->jflbm) {
-				free(w->jflbm);
-				w->jflbm = sjflbm[sdep][i];
-			}
 			if (w->sdata) {
 				free(w->sdata);
 				w->sdata = ssdata[sdep][i];
@@ -856,8 +621,6 @@ static void state_finit(void) {
 static int buildlists(void) {int u,i,j;
 	for(i = 0;i<nw;i++) {
 		FREEX(words[i].flist);
-		FREEX(words[i].jdata);
-		FREEX(words[i].jflbm);
 		FREEX(words[i].sdata);
 		lightx = words[i].gx0;
 		lighty = words[i].gy0;
@@ -869,7 +632,6 @@ static int buildlists(void) {int u,i,j;
 		u = getinitflist(&words[i].flist,&words[i].flistlen,words[i].lp,words[i].wlen);
 		if (u) {filler_status = -3;return 0;}
 		if (words[i].lp->ten) clueorderindex++;
-		if (initjdata(i)) {filler_status = -3;return 0;}
 		if (initsdata(i)) {filler_status = -3;return 0;}
 	}
 	if (postgetinitflist()) {filler_status = -4;return 1;}

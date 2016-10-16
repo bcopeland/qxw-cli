@@ -786,9 +786,6 @@ int treatedanswer(const char*s) {
   if(l!=lightlength) return 0;
   assert(l>0);
   if(tambaw&&!isword(s)) return 0;
-  if(curem&EM_JUM) { // jumbled entry method
-    return addlight(s,curans,4); // just store normal entry
-    }
   if(curem&EM_FWD) { // forwards entry method
     u=addlight(s,curans,0);if(u) return u;
     }
