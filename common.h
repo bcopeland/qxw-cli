@@ -289,4 +289,9 @@ static inline int logbase2(int i)
 	return ffs(i) - 1;
 }
 
+static inline int onebit(int x)
+{
+	return x != 0 && (x & (x-1)) == 0;
+}
+
 #endif

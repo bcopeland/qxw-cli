@@ -107,7 +107,6 @@ void reperr(const char*s) {
 }
 
 int cbits(ABM x) {ABM i; int j; for(i=1,j=0;i<ABM_ALL;i+=i) if(x&i) j++; return j;} // count set bits
-int onebit(ABM x) {return x!=0&&(x&(x-1))==0;}
 
 int*llistp=0;    // ptr to matching lights
 int llistn=0;    // number of matching lights
