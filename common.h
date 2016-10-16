@@ -108,12 +108,6 @@ struct sprop { // square properties
 
 // entry methods
 #define EM_FWD 1
-#define EM_REV 2
-#define EM_CYC 4
-#define EM_RCY 8
-#define EM_JUM 16
-#define EM_ALL 31
-#define EM_SPR 32 // for internal use only
 
 struct lprop { // light properties
   unsigned int dmask; // mask of allowed dictionaries; special values 1<<MAXNDICTS and above for "implicit" words

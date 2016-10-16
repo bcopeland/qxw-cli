@@ -779,39 +779,13 @@ static int addlight(const char*s,int a,int e) {
 // Add treated answer to feasible light list if suitable
 // returns !=0 for error
 int treatedanswer(const char*s) {
-  char s0[MXFL+1];
-  int j,k,l,u;
+  int l,u;
 
   l=strlen(s);
   if(l!=lightlength) return 0;
   assert(l>0);
   if(tambaw&&!isword(s)) return 0;
-  if(curem&EM_FWD) { // forwards entry method
-    u=addlight(s,curans,0);if(u) return u;
-    }
-  if(curem&EM_REV) {
-    for(j=0;j<l;j++) s0[j]=s[l-j-1]; // reversed entry method
-    s0[j]=0;
-    u=addlight(s0,curans,1);if(u) return u;
-    }
-  if(curem&EM_CYC) { // cyclic permutation
-    if(!(l==2&&(curem&EM_REV))) { // not if already covered by reversal
-      for(k=1;k<l;k++) {
-        for(j=0;j<l;j++) s0[j]=s[(j+k)%l];
-        s0[j]=0;
-        u=addlight(s0,curans,2);if(u) return u;
-        }
-      }
-    }
-  if(curem&EM_RCY) { // reversed cyclic permutation
-    if(!(l==2&&(curem&EM_FWD))) { // not if already covered by forwards entry
-      for(k=1;k<l;k++) {
-        for(j=0;j<l;j++) s0[j]=s[(l-j-1+k)%l];
-        s0[j]=0;
-        u=addlight(s0,curans,3);if(u) return u;
-        }
-      }
-    }
+  u=addlight(s,curans,0);if(u) return u;
   return 0;
   }
 
@@ -1066,7 +1040,7 @@ int getinitflist(int**l,int*ll,struct lprop*lp,int llen) {
     if(u) return u;
     goto ex0;
     }
-  if((curem&EM_ALL)==0) curem=EM_FWD; // force normal entry to be allowed if all are disabled
+  curem=EM_FWD; // force normal entry to be allowed if all are disabled
   lightlength=llen;
   DEB2 printf("getinitflist(%p) llen=%d dmask=%08x emask=%08x ten=%d:\n",lp,llen,curdm,curem,curten);
   memset(mfl,0,sizeof(mfl));
