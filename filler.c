@@ -78,14 +78,14 @@ static unsigned char *lused;       // light already used while filling
 } while (0)
 
 static void pstate(int f) {
-	int i,j,jmode=0;
+	int i,j;
 	struct word*w;
 	struct entry*e;
 	char s[MXFL+1];
 
 	for(i = 0;i<nw;i++) {
 		w = words+i;
-		printf("W%d: fe = %d jmode = %d nent = %d wlen = %d jlen = %d ",i,w->fe,jmode,w->nent,w->wlen,w->jlen);
+		printf("W%d: fe = %d nent = %d wlen = %d jlen = %d ",i,w->fe,w->nent,w->wlen,w->jlen);
 		for(j = 0;j<w->nent;j++) {
 			e = w->e[j];
 			s[j] = abmtoechar(e->flbm);
@@ -146,7 +146,7 @@ static int settleents(void)
 	struct entry *e;
 	struct word *w;
 	struct sdata *sd;
-	int f, i, j, k, l, m, jmode=0;
+	int f, i, j, k, l, m;
 	int *p;
 	bool aed;
 
@@ -154,7 +154,7 @@ static int settleents(void)
 
 	for (j = 0; j < nw; j++) {
 		w = &words[j];
-		//    printf("j = %d jmode = %d emask = %d\n",j,jmode,w->lp->emask);
+		//    printf("j = %d emask = %d\n",j,w->lp->emask);
 		m = w->nent;
 		for (k = 0; k < m; k++)
 			if (w->e[k]->upd)
@@ -184,16 +184,14 @@ static int settleents(void)
 			l = k;
 		}
 
-		if (jmode == 0) {	// normal case
-			for (k = 0; k < m; k++) {	// think about moving this loop inside listisect()
-				e = w->e[k];
-				if (!e->upd)
-					continue;
-				l = listisect(w->flist, p, l, k, e->flbm);	// generate new feasible word list
-				p = w->flist;
-				if (l == 0)
-					break;
-			}
+		for (k = 0; k < m; k++) {	// think about moving this loop inside listisect()
+			e = w->e[k];
+			if (!e->upd)
+				continue;
+			l = listisect(w->flist, p, l, k, e->flbm);	// generate new feasible word list
+			p = w->flist;
+			if (l == 0)
+				break;
 		}
 
 		if (l != w->flistlen) {
@@ -235,7 +233,7 @@ static int settleents(void)
 // returns -3 for aborted, 0 if no feasible letter lists affected, >0 otherwise
 static int settlewds(void)
 {
-	int f, i, j, k, l, m, jmode=0;
+	int f, i, j, k, l, m;
 	int *p;
 	struct entry *e;
 	struct word *w;
@@ -254,10 +252,9 @@ static int settlewds(void)
 
 		for (k = 0; k < m; k++)
 			entfl[k] = 0;
-		if (jmode == 0)
-			for (j = 0; j < l; j++)
-				for (k = 0; k < m; k++)
-					entfl[k] |= chartoabm[(int)lts[p[j]].s[k]];	// find all feasible letters from word list
+		for (j = 0; j < l; j++)
+			for (k = 0; k < m; k++)
+				entfl[k] |= chartoabm[(int)lts[p[j]].s[k]];	// find all feasible letters from word list
 		DEB16 {
 			printf("w = %d entfl: ", i);
 			for (k = 0; k < m; k++)
@@ -283,7 +280,7 @@ static int settlewds(void)
 // calculate per-entry scores
 // returns -3 if aborted
 static int mkscores(void) {
-	int i,j,k,l,m,jmode=0;
+	int i,j,k,l,m;
 	int*p;
 	double f;
 	struct word*w;
@@ -299,16 +296,14 @@ static int mkscores(void) {
 		l = w->flistlen;
 		for(k = 0;k<m;k++) for(j = 0;j<NL;j++) sc[k][j] = 0.0;
 
-		if (jmode == 0) { // normal case
-			if (afunique&&w->commitdep >= 0) {  // avoid zero score if we've committed
-				if (l == 1) for(k = 0;k<m;k++) sc[k][chartol[(int)lts[p[0]].s[k]]] += 1.0;
-			}
-			else {
-				for(j = 0;j<l;j++) if (!(afunique&&isused(p[j]))) { // for each remaining feasible word
-					if (lts[p[j]].ans<0) f = 1;
-					else f = (double)ansp[lts[p[j]].ans]->score;
-					for(k = 0;k<m;k++) sc[k][chartol[(int)lts[p[j]].s[k]]] += f; // add in its score to this cell's score
-				}
+		if (afunique&&w->commitdep >= 0) {  // avoid zero score if we've committed
+			if (l == 1) for(k = 0;k<m;k++) sc[k][chartol[(int)lts[p[0]].s[k]]] += 1.0;
+		}
+		else {
+			for(j = 0;j<l;j++) if (!(afunique&&isused(p[j]))) { // for each remaining feasible word
+				if (lts[p[j]].ans<0) f = 1;
+				else f = (double)ansp[lts[p[j]].ans]->score;
+				for(k = 0;k<m;k++) sc[k][chartol[(int)lts[p[j]].s[k]]] += f; // add in its score to this cell's score
 			}
 		}
 
