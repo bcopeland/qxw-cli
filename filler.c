@@ -49,6 +49,7 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 #include "common.h"
 #include "filler.h"
 #include "dicts.h"
+#include <stdbool.h>
 
 // 0 = stopped, 1 = filling all, 2 = filling selection, 3 = word lists only (for preexport)
 static int fillmode;
@@ -63,7 +64,6 @@ static int sdep = -1; // stack pointer
 static char **sposs;               // possibilities for this entry, 0-terminated
 static int *spossp;                // which possibility we are currently trying (index into sposs)
 static int ***sflist;              // pointers to restore feasible word list flist
-static struct sdata ***ssdata;     // spread data
 static int **sflistlen;            // pointers to restore flistlen
 static ABM **sentryfl;             // feasible letter bitmap for this entry
 static int *sentry;                // entry considered at this depth
@@ -78,15 +78,13 @@ static unsigned char *lused;       // light already used while filling
 } while (0)
 
 static void pstate(int f) {
-	int i,j,jmode;
+	int i,j,jmode=0;
 	struct word*w;
 	struct entry*e;
 	char s[MXFL+1];
 
 	for(i = 0;i<nw;i++) {
 		w = words+i;
-		if (w->lp->emask&EM_SPR) jmode = 2;
-		else                         jmode = 0;
 		printf("W%d: fe = %d jmode = %d nent = %d wlen = %d jlen = %d ",i,w->fe,jmode,w->nent,w->wlen,w->jlen);
 		for(j = 0;j<w->nent;j++) {
 			e = w->e[j];
@@ -108,99 +106,6 @@ static void pstate(int f) {
 			printf(" (%d)\n",w->flistlen);
 		}
 	}
-}
-
-static int initsdata(int j) {struct word*w; int i,k;
-	w = words+j;
-	if (!(w->lp->emask&EM_SPR)) return 0;
-	if (w->fe) return 0;
-	w->sdata = malloc(w->flistlen*sizeof(struct sdata));
-	if (!w->sdata) return -1;
-	for(i = 0;i<w->flistlen;i++) for(k = 0;k<w->nent;k++) w->sdata[i].flbm[k] = ABM_ALL;
-	return 0;
-}
-
-// Calculate number of possible spreads that put each possible letter in each position
-// given implications of flbm:s.
-static void scounts(struct word*w,int wn,ABM*bm) {
-	struct sdata*sd;
-	struct light*l;
-	int i,j,m,n;
-	ABM u;
-	// following are static to avoid overflowing stack (!) in Windows version
-	static double ctl[MXFL+1][MXFL+1]; // ctl[i][j] is # of arrangements where chars [0,i) fit in slots [0,j)
-	static double ctr[MXFL+1][MXFL+1]; // ctr[i][j] is # of arrangements where chars [i,n) fit in slots [j,m)
-
-	l = lts+w->flist[wn];
-	m = w->nent;
-	n = w->wlen;
-	sd = w->sdata+wn;
-	DEB16 printf("scounts: w = %ld \"%s\"\n",(long int)(w-words),l->s);
-	memset(ctl,0,sizeof(ctl));
-	ctl[0][0] = 1;
-	for(j = 1;j <= m;j++) {
-		u = bm[j-1];
-		for(i = 0;i <= n;i++) {
-			if (u&ABM_DASH) ctl[i][j] = ctl[i][j-1];
-			if (i>0&&(u&chartoabm[(int)l->s[i-1]])) ctl[i][j] += ctl[i-1][j-1];
-		}
-	}
-	memset(ctr,0,sizeof(ctr));
-	ctr[n][m] = 1;
-	for(j = m-1;j >= 0;j--) {
-		u = bm[j];
-		for(i = n;i >= 0;i--) {
-			if (u&ABM_DASH) ctr[i][j] = ctr[i][j+1];
-			if (i<n&&(u&chartoabm[(int)l->s[i]])) ctr[i][j] += ctr[i+1][j+1];
-		}
-	}
-	DEB16 {
-		printf("CTL: # of ways to put chars [0,i) in slots [0,j)\n");
-		for(j = 0;j <= m;j++) {
-			for(i = 0;i <= n;i++) printf("%5.1f ",ctl[i][j]);
-			printf("\n");
-		}
-		printf("CTR: # of ways to put chars [i,n) in slots [j,m)\n");
-		for(j = 0;j <= m;j++) {
-			for(i = 0;i <= n;i++) printf("%5.1f ",ctr[i][j]);
-			printf("\n");
-		}
-	}
-	memset(sd->ct,0,sizeof(sd->ct));
-	memset(sd->ctd,0,sizeof(sd->ctd));
-	for(i = 0;i< n;i++) for(j = 0;j<m;j++) sd->ct[i][j] = ctl[i][j]*ctr[i+1][j+1];
-	for(j = 0;j<m;j++) if (bm[j]&ABM_DASH) for(i = 0;i <= n;i++) sd->ctd[j]  += ctl[i][j]*ctr[i][j+1]; // do the spreading character as a special case
-	DEB16 {
-		printf("        " ); for(i = 0;i<n;i++) printf("  %c   ",l->s[i]); printf("      -\n");
-		for(j = 0;j<m;j++) {printf("  e%2d:",j); for(i = 0;i<n;i++) printf(" %5.1f",sd->ct[i][j]); printf("     %5.1f",sd->ctd[j]); printf("\n");}
-	}
-	memset(sd->flbm,0,sizeof(sd->flbm));
-	for(i = 0;i<n;i++) for(j = 0;j<m;j++) if (sd->ct[i][j]) sd->flbm[j] |= chartoabm[(int)l->s[i]];
-	for(j = 0;j<m;j++) if (sd->ctd[j])   sd->flbm[j] |= ABM_DASH;
-}
-
-// Test to see if a spread string can fit in a given word. Writes deductions to sdata.
-static int checksword(struct word*w,int j) {
-	ABM bm[MXFL];
-	struct light*l;
-	struct sdata*sd;
-	int k,m; //,n;
-
-	l = lts+w->flist[j];
-	sd = w->sdata+j;
-	m = w->nent;
-	//  n = w->wlen;
-	for(k = 0;k<m;k++) bm[k] = w->e[k]->flbm;
-	DEB16 {
-		printf("checksword(w = %ld,\"%s\") bm = ",(long int)(w-words),l->s);
-		for(k = 0;k<m;k++) printf("%016llx ",bm[k]); printf("\n");
-	}
-	scounts(w,j,bm);
-	DEB16 {
-		printf("  output bm = ");
-		for(k = 0;k<m;k++) printf("%016llx ",sd->flbm[k]); printf("\n");
-	}
-	return 1;
 }
 
 // intersect light list q length l with letter position wp masked by bitmap m: result is stored in p and new length is returned
@@ -241,7 +146,7 @@ static int settleents(void)
 	struct entry *e;
 	struct word *w;
 	struct sdata *sd;
-	int f, i, j, k, l, m, jmode;
+	int f, i, j, k, l, m, jmode=0;
 	int *p;
 	bool aed;
 
@@ -249,10 +154,6 @@ static int settleents(void)
 
 	for (j = 0; j < nw; j++) {
 		w = &words[j];
-		if (w->lp->emask & EM_SPR)
-			jmode = 2;
-		else
-			jmode = 0;
 		//    printf("j = %d jmode = %d emask = %d\n",j,jmode,w->lp->emask);
 		m = w->nent;
 		for (k = 0; k < m; k++)
@@ -270,19 +171,10 @@ static int settleents(void)
 		if (sflistlen[sdep][j] == -1) {	// then we mustn't trash words[].flist
 			sflist[sdep][j] = p;
 			sflistlen[sdep][j] = l;
-			ssdata[sdep][j] = sd;
 			w->sdata = 0;
 			w->flist = (int *)malloc(l * sizeof(int));	// new list can be at most as long as old one
 			if (!w->flist)
 				return -1;	// out of memory
-			if (jmode == 2) {
-				w->sdata =
-				    (struct sdata *)malloc(l *
-							   sizeof(struct
-								  sdata));
-				if (!w->sdata)
-					return -1;	// out of memory
-			}
 		}
 		if (afunique) {	// the following test makes things quite a lot slower: consider optimising by keeping track of when an update might be needed
 			for (i = 0, k = 0; i < l; i++)
@@ -302,15 +194,6 @@ static int settleents(void)
 				if (l == 0)
 					break;
 			}
-		} else {	// spread case
-			for (i = 0, k = 0; i < l; i++) {
-				w->flist[k] = p[i];
-				if (checksword(w, k))
-					k++;
-			}
-			l = k;
-			w->upd = 1;
-			f++;	// need to do settlents() anyway in this case
 		}
 
 		if (l != w->flistlen) {
@@ -352,7 +235,7 @@ static int settleents(void)
 // returns -3 for aborted, 0 if no feasible letter lists affected, >0 otherwise
 static int settlewds(void)
 {
-	int f, i, j, k, l, m, jmode;
+	int f, i, j, k, l, m, jmode=0;
 	int *p;
 	struct entry *e;
 	struct word *w;
@@ -365,10 +248,6 @@ static int settlewds(void)
 			continue;	// loop over updated word lists
 		if (w->fe)
 			continue;
-		if (w->lp->emask & EM_SPR)
-			jmode = 2;
-		else
-			jmode = 0;
 		m = w->nent;
 		p = w->flist;
 		l = w->flistlen;
@@ -379,11 +258,6 @@ static int settlewds(void)
 			for (j = 0; j < l; j++)
 				for (k = 0; k < m; k++)
 					entfl[k] |= chartoabm[(int)lts[p[j]].s[k]];	// find all feasible letters from word list
-		else if (jmode == 2)
-			for (j = 0; j < l; j++)
-				for (k = 0; k < m; k++)
-					entfl[k] |= w->sdata[j].flbm[k];	// main work has been done in settleents()
-
 		DEB16 {
 			printf("w = %d entfl: ", i);
 			for (k = 0; k < m; k++)
@@ -406,43 +280,20 @@ static int settlewds(void)
 	return f;
 }
 
-// calculate scores for spread entry
-static void sscores(struct word*w,int wn,double(*sc)[NL]) {
-	struct sdata*sd;
-	struct light*l;
-	int c,i,j,k,m,n;
-
-	l = lts+w->flist[wn];
-	m = w->nent;
-	n = w->wlen;
-	sd = w->sdata+wn;
-	memset(sc,0,m*NL*sizeof(double));
-	for(i = 0;i<n;i++) {
-		c = chartol[(int)l->s[i]];
-		for(j = 0;j<m;j++) sc[j][c] += sd->ct[i][j];
-	}
-	// now do the spreading character as a special case: i = #chars to left of candidate '-'
-	for(j = 0;j<m;j++) sc[j][NL-1] += sd->ctd[j];
-	DEB16 for(k = 0;k<m;k++) {printf("  e%2d:",k); for(i = 0;i<NL;i++) {printf(" %5.1f",sc[k][i]); if (i == 25||i == 35) printf("  ");} printf("\n"); }
-}
-
-
 // calculate per-entry scores
 // returns -3 if aborted
 static int mkscores(void) {
-	int c,i,j,k,l,m,jmode;
+	int i,j,k,l,m,jmode=0;
 	int*p;
 	double f;
 	struct word*w;
 	// following static to reduce stack use
-	static double sc[MXFL][NL],tsc[MXFL][NL]; // weighted count of number of words that put a given letter in a given place
+	static double sc[MXFL][NL]; // weighted count of number of words that put a given letter in a given place
 
 	for(i = 0;i<ne;i++) for(j = 0;j<NL;j++) entries[i].score[j] = 1.0;
 	for(i = 0;i<nw;i++) {
 		w = words+i;
 		if (w->fe) continue;
-		if (w->lp->emask&EM_SPR) jmode = 2;
-		else                         jmode = 0;
 		m = w->nent;
 		p = w->flist;
 		l = w->flistlen;
@@ -458,11 +309,6 @@ static int mkscores(void) {
 					else f = (double)ansp[lts[p[j]].ans]->score;
 					for(k = 0;k<m;k++) sc[k][chartol[(int)lts[p[j]].s[k]]] += f; // add in its score to this cell's score
 				}
-			}
-		} else { // spread case
-			for(j = 0;j<l;j++) {
-				sscores(w,j,tsc);
-				for(k = 0;k<m;k++) for(c = 0;c<NL;c++) sc[k][c] += tsc[k][c];
 			}
 		}
 
@@ -504,14 +350,12 @@ static void freestack() {int i;
 	for(i = 0;i <= ne;i++) {
 		if (sposs     ) FREEX(sposs     [i]);
 		if (sflist    ) FREEX(sflist    [i]);
-		if (ssdata    ) FREEX(ssdata    [i]);
 		if (sflistlen ) FREEX(sflistlen [i]);
 		if (sentryfl  ) FREEX(sentryfl  [i]);
 	}
 	FREEX(sposs);
 	FREEX(spossp);
 	FREEX(sflist);
-	FREEX(ssdata);
 	FREEX(sflistlen);
 	FREEX(sentryfl);
 	FREEX(sentry);
@@ -522,14 +366,12 @@ static int allocstack() {int i;
 	if (!(sposs     =calloc(ne+1,sizeof(char*         )))) return 1;
 	if (!(spossp    =calloc(ne+1,sizeof(int           )))) return 1;
 	if (!(sflist    =calloc(ne+1,sizeof(int**         )))) return 1;
-	if (!(ssdata    =calloc(ne+1,sizeof(struct sdata**)))) return 1;
 	if (!(sflistlen =calloc(ne+1,sizeof(int*          )))) return 1;
 	if (!(sentryfl  =calloc(ne+1,sizeof(ABM*          )))) return 1;
 	if (!(sentry    =calloc(ne+1,sizeof(int           )))) return 1;
 	for(i = 0;i <= ne;i++) { // for each stack depth that can be reached
 		if (!(sposs     [i] = malloc(NL+1                    ))) return 1;
 		if (!(sflist    [i] = malloc(nw*sizeof(int*         )))) return 1;
-		if (!(ssdata    [i] = malloc(nw*sizeof(struct sdata*)))) return 1;
 		if (!(sflistlen [i] = malloc(nw*sizeof(int          )))) return 1;
 		if (!(sentryfl  [i] = malloc(ne*sizeof(ABM          )))) return 1;
 	}
@@ -568,10 +410,6 @@ static void state_restore(void) {int i,j,l; struct word*w;
 			free(w->flist);
 			w->flist = sflist[sdep][i];
 			w->flistlen = sflistlen[sdep][i];
-			if (w->sdata) {
-				free(w->sdata);
-				w->sdata = ssdata[sdep][i];
-			}
 		}
 	}
 	for(i = 0;i<ne;i++) entries[i].flbm = sentryfl[sdep][i];
@@ -606,7 +444,6 @@ static int buildlists(void) {int u,i,j;
 		u = getinitflist(&words[i].flist,&words[i].flistlen,words[i].lp,words[i].wlen);
 		if (u) {filler_status = -3;return 0;}
 		if (words[i].lp->ten) clueorderindex++;
-		if (initsdata(i)) {filler_status = -3;return 0;}
 	}
 	if (postgetinitflist()) {filler_status = -4;return 1;}
 	FREEX(aused);
