@@ -142,6 +142,18 @@ static int findcritent(void) {int i,j,m;double k,l;
 	return j; // return -1 if no entries left to expand
 }
 
+
+static bool word_has_updates(struct word *word)
+{
+	int i;
+
+	for (i = 0; i < word->nent; i++) {
+		if (word->e[i]->upd)
+			return true;
+	}
+	return false;
+}
+
 /*
  * Check updated entries and rebuild feasible word lists
  * returns -3 for aborted, -2 for infeasible, -1 for out of memory, 0 if no feasible word lists affected,  >= 1 otherwise
@@ -158,14 +170,13 @@ static int settleents(void)
 	f = 0;
 
 	for (j = 0; j < nw; j++) {
+
+		/* check this word for any updated entries (cells) */
 		w = &words[j];
-		//    printf("j = %d emask = %d\n",j,w->lp->emask);
+		if (!word_has_updates(w))
+			continue;
+
 		m = w->nent;
-		for (k = 0; k < m; k++)
-			if (w->e[k]->upd)
-				break;
-		if (k == m)
-			continue;	// no update flags set on any entries for this word
 		for (k = 0; k < m; k++)
 			if (!onebit(w->e[k]->flbm))
 				break;
