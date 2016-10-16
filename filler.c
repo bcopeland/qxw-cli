@@ -241,12 +241,14 @@ static int settleents(void)
 	struct entry *e;
 	struct word *w;
 	struct sdata *sd;
-	int aed, f, i, j, k, l, m, jmode;
+	int f, i, j, k, l, m, jmode;
 	int *p;
+	bool aed;
 
 	f = 0;
+
 	for (j = 0; j < nw; j++) {
-		w = words + j;
+		w = &words[j];
 		if (w->lp->emask & EM_SPR)
 			jmode = 2;
 		else
