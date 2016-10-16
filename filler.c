@@ -106,10 +106,17 @@ static void pstate(int f) {
 	}
 }
 
-// intersect light list q length l with letter position wp masked by bitmap m: result is stored in p and new length is returned
-static int listisect(int*p,int*q,int l,int wp,ABM m) {int i,j;
-	for(i = 0,j = 0;i<l;i++) if (m&(chartoabm[(int)(lts[q[i]].s[wp])])) p[j++] = q[i];
-	//printf("listisect l(wp = %d m = %16llx) %d->%d\n",wp,m,l,j);
+/*
+ * Find all lights in the list of light indices whose character at
+ * index wp satisfies feasible letter bitmap m.
+ */
+static int listisect(int *p, int *lights, int lights_len, int wp, ABM m)
+{
+	int i, j;
+	for (i = 0, j = 0; i < lights_len; i++)
+		if (m & (chartoabm[(int)(lts[lights[i]].s[wp])]))
+			p[j++] = lights[i];
+
 	return j;
 }
 
