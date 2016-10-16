@@ -106,20 +106,6 @@ static void pstate(int f) {
 	}
 }
 
-/*
- * Find all lights in the list of light indices whose character at
- * index wp satisfies feasible letter bitmap m.
- */
-static int listisect(int *p, int *lights, int lights_len, int wp, ABM m)
-{
-	int i, j;
-	for (i = 0, j = 0; i < lights_len; i++)
-		if (m & (chartoabm[(int)(lts[lights[i]].s[wp])]))
-			p[j++] = lights[i];
-
-	return j;
-}
-
 // find the entry to expand next, or -1 if all done
 static int findcritent(void) {int i,j,m;double k,l;
 	m = -1;
@@ -155,12 +141,47 @@ static bool word_has_updates(struct word *word)
 }
 
 /*
+ * Find all lights in the list of light indices whose character at
+ * index wp satisfies feasible letter bitmap m.
+ */
+static int listisect(int *p, int *lights, int lights_len, int wp, ABM m)
+{
+	int i, j;
+	for (i = 0, j = 0; i < lights_len; i++)
+		if (m & (chartoabm[(int)(lts[lights[i]].s[wp])]))
+			p[j++] = lights[i];
+
+	return j;
+}
+
+/*
+ * For all updated entries in a given word, reduce the feasible
+ * list to the words that match the current bitmaps.
+ */
+static int update_feasible_words(struct word *word, int len)
+{
+	int i;
+	struct entry *entry;
+
+	for (i = 0; i < word->nent; i++) {
+		entry = word->e[i];
+		if (!entry->upd)
+			continue;
+
+		len = listisect(word->flist, word->flist, len, i, entry->flbm);
+		if (!len)
+			break;
+	}
+	return len;
+}
+
+
+/*
  * Check updated entries and rebuild feasible word lists
  * returns -3 for aborted, -2 for infeasible, -1 for out of memory, 0 if no feasible word lists affected,  >= 1 otherwise
  */
 static int settleents(void)
 {
-	struct entry *e;
 	struct word *w;
 	struct sdata *sd;
 	int f, i, j, k, l, m;
@@ -200,15 +221,7 @@ static int settleents(void)
 			l = k;
 		}
 
-		for (k = 0; k < m; k++) {	// think about moving this loop inside listisect()
-			e = w->e[k];
-			if (!e->upd)
-				continue;
-			l = listisect(w->flist, p, l, k, e->flbm);	// generate new feasible word list
-			p = w->flist;
-			if (l == 0)
-				break;
-		}
+		l = update_feasible_words(w, l);
 
 		if (l != w->flistlen) {
 			w->upd = 1;
