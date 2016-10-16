@@ -682,7 +682,6 @@ backtrack:
 static void searchdone() {
 	int i;
 	DEB1 printf("searchdone: A\n");
-	gdk_threads_enter();
 	DEB1 printf("searchdone: B\n");
 	if (filler_status == 2) {
 		mkfeas(); // construct feasible word list
@@ -695,7 +694,6 @@ static void searchdone() {
 	}
 	// updatefeas();
 	update_grid();
-	gdk_threads_leave();
 	DEB1 printf("searchdone: C\n");
 	state_finit();
 	// if (fillmode&&currentdia) gtk_dialog_response(GTK_DIALOG(currentdia),GTK_RESPONSE_CANCEL);
