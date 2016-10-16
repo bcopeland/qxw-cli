@@ -183,7 +183,6 @@ static int update_feasible_words(struct word *word, int len)
 static int settleents(void)
 {
 	struct word *w;
-	struct sdata *sd;
 	int f, i, j, k, l, m;
 	int *p;
 	bool aed;
@@ -204,11 +203,9 @@ static int settleents(void)
 		aed = (k == m);	// all entries determined?
 		p = w->flist;
 		l = w->flistlen;
-		sd = w->sdata;
 		if (sflistlen[sdep][j] == -1) {	// then we mustn't trash words[].flist
 			sflist[sdep][j] = p;
 			sflistlen[sdep][j] = l;
-			w->sdata = 0;
 			w->flist = (int *)malloc(l * sizeof(int));	// new list can be at most as long as old one
 			if (!w->flist)
 				return -1;	// out of memory
@@ -230,12 +227,6 @@ static int settleents(void)
 				p = realloc(w->flist, l * sizeof(int));
 				if (p)
 					w->flist = p;
-				if (w->sdata) {
-					sd = realloc(w->sdata,
-						     l * sizeof(struct sdata));
-					if (sd)
-						w->sdata = sd;
-				}
 			}
 		}
 		w->flistlen = l;
@@ -454,7 +445,6 @@ static void state_finit(void) {
 static int buildlists(void) {int u,i,j;
 	for(i = 0;i<nw;i++) {
 		FREEX(words[i].flist);
-		FREEX(words[i].sdata);
 		lightx = words[i].gx0;
 		lighty = words[i].gy0;
 		lightdir = words[i].ldir;
