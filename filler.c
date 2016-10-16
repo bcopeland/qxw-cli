@@ -364,118 +364,172 @@ static int findcritent(void) {int i,j,m;double k,l;
 	return j; // return -1 if no entries left to expand
 }
 
-// check updated entries and rebuild feasible word lists
-// returns -3 for aborted, -2 for infeasible, -1 for out of memory, 0 if no feasible word lists affected,  >= 1 otherwise
-static int settleents(void) {
-	struct entry*e;
-	struct word*w;
-	struct jdata*jd;
-	struct sdata*sd;
-	ABM*jdf;
-	int aed,f,i,j,k,l,m,mj,jmode;
-	int*p;
-	//  DEB1 printf("settleents() sdep = %d\n",sdep);
+/*
+ * Check updated entries and rebuild feasible word lists
+ * returns -3 for aborted, -2 for infeasible, -1 for out of memory, 0 if no feasible word lists affected,  >= 1 otherwise
+ */
+static int settleents(void)
+{
+	struct entry *e;
+	struct word *w;
+	struct jdata *jd;
+	struct sdata *sd;
+	ABM *jdf;
+	int aed, f, i, j, k, l, m, mj, jmode;
+	int *p;
+
 	f = 0;
-	for(j = 0;j<nw;j++) {
-		w = words+j;
-		if (w->lp->emask&EM_JUM) jmode = 1;
-		else if (w->lp->emask&EM_SPR) jmode = 2;
-		else                         jmode = 0;
+	for (j = 0; j < nw; j++) {
+		w = words + j;
+		if (w->lp->emask & EM_JUM)
+			jmode = 1;
+		else if (w->lp->emask & EM_SPR)
+			jmode = 2;
+		else
+			jmode = 0;
 		//    printf("j = %d jmode = %d emask = %d\n",j,jmode,w->lp->emask);
 		m = w->nent;
 		mj = w->jlen;
-		for(k = 0;k<m;k++) if (w->e[k]->upd) break;
-		if (k == m) continue; // no update flags set on any entries for this word
-		for(k = 0;k<m;k++) if (!onebit(w->e[k]->flbm)) break;
-		aed = (k == m); // all entries determined?
+		for (k = 0; k < m; k++)
+			if (w->e[k]->upd)
+				break;
+		if (k == m)
+			continue;	// no update flags set on any entries for this word
+		for (k = 0; k < m; k++)
+			if (!onebit(w->e[k]->flbm))
+				break;
+		aed = (k == m);	// all entries determined?
 		p = w->flist;
 		l = w->flistlen;
 		jd = w->jdata;
 		sd = w->sdata;
-		if (sflistlen[sdep][j] == -1) {  // then we mustn't trash words[].flist
-			sflist   [sdep][j] = p;
+		if (sflistlen[sdep][j] == -1) {	// then we mustn't trash words[].flist
+			sflist[sdep][j] = p;
 			sflistlen[sdep][j] = l;
-			sjdata   [sdep][j] = jd;
-			sjflbm   [sdep][j] = w->jflbm;
-			ssdata   [sdep][j] = sd;
+			sjdata[sdep][j] = jd;
+			sjflbm[sdep][j] = w->jflbm;
+			ssdata[sdep][j] = sd;
 			w->jdata = 0;
 			w->jflbm = 0;
 			w->sdata = 0;
-			w->flist = (int*)malloc(l*sizeof(int)); // new list can be at most as long as old one
-			if (!w->flist) return -1; // out of memory
+			w->flist = (int *)malloc(l * sizeof(int));	// new list can be at most as long as old one
+			if (!w->flist)
+				return -1;	// out of memory
 			if (jmode == 1) {
-				w->jdata = (struct jdata*)malloc(l*sizeof(struct jdata));
-				if (!w->jdata) return -1; // out of memory
-				w->jflbm = (ABM*)malloc(l*mj*sizeof(ABM));
-				if (!w->jflbm) return -1; // out of memory
+				w->jdata =
+				    (struct jdata *)malloc(l *
+							   sizeof(struct
+								  jdata));
+				if (!w->jdata)
+					return -1;	// out of memory
+				w->jflbm = (ABM *) malloc(l * mj * sizeof(ABM));
+				if (!w->jflbm)
+					return -1;	// out of memory
 			}
 			if (jmode == 2) {
-				w->sdata = (struct sdata*)malloc(l*sizeof(struct sdata));
-				if (!w->sdata) return -1; // out of memory
+				w->sdata =
+				    (struct sdata *)malloc(l *
+							   sizeof(struct
+								  sdata));
+				if (!w->sdata)
+					return -1;	// out of memory
 			}
 		}
-		if (afunique) { // the following test makes things quite a lot slower: consider optimising by keeping track of when an update might be needed
-			for(i = 0,k = 0;i<l;i++) if (!isused(p[i])) w->flist[k++] = p[i];
+		if (afunique) {	// the following test makes things quite a lot slower: consider optimising by keeping track of when an update might be needed
+			for (i = 0, k = 0; i < l; i++)
+				if (!isused(p[i]))
+					w->flist[k++] = p[i];
 			p = w->flist;
 			l = k;
 		}
 
-		if (jmode == 0) { // normal case
-			for(k = 0;k<m;k++) { // think about moving this loop inside listisect()
+		if (jmode == 0) {	// normal case
+			for (k = 0; k < m; k++) {	// think about moving this loop inside listisect()
 				e = w->e[k];
-				if (!e->upd) continue;
-				l = listisect(w->flist,p,l,k,e->flbm); // generate new feasible word list
+				if (!e->upd)
+					continue;
+				l = listisect(w->flist, p, l, k, e->flbm);	// generate new feasible word list
 				p = w->flist;
-				if (l == 0) break;
+				if (l == 0)
+					break;
 			}
-		} else if (jmode == 1) { // jumble case
-			for(k = mj;k<m;k++) { // loop over tags if any
+		} else if (jmode == 1) {	// jumble case
+			for (k = mj; k < m; k++) {	// loop over tags if any
 				e = w->e[k];
-				if (!e->upd) continue;
-				l = listisect(w->flist,p,l,k,e->flbm); // generate new feasible word list
+				if (!e->upd)
+					continue;
+				l = listisect(w->flist, p, l, k, e->flbm);	// generate new feasible word list
 				p = w->flist;
 			}
-			for(i = 0,k = 0;i<l;i++) {w->flist[k] = p[i]; if (checkjword(w,k)) k++;}
+			for (i = 0, k = 0; i < l; i++) {
+				w->flist[k] = p[i];
+				if (checkjword(w, k))
+					k++;
+			}
 			l = k;
-			w->upd = 1; f++; // need to do settlents() anyway in this case
-		} else { // spread case
-			for(i = 0,k = 0;i<l;i++) {w->flist[k] = p[i]; if (checksword(w,k)) k++;}
+			w->upd = 1;
+			f++;	// need to do settlents() anyway in this case
+		} else {	// spread case
+			for (i = 0, k = 0; i < l; i++) {
+				w->flist[k] = p[i];
+				if (checksword(w, k))
+					k++;
+			}
 			l = k;
-			w->upd = 1; f++; // need to do settlents() anyway in this case
+			w->upd = 1;
+			f++;	// need to do settlents() anyway in this case
 		}
 
-		if (l !=  w->flistlen) {
-			w->upd = 1;f++; // word list has changed: feasible letter lists will need updating
+		if (l != w->flistlen) {
+			w->upd = 1;
+			f++;	// word list has changed: feasible letter lists will need updating
 			if (l) {
-				p = realloc(w->flist,l*sizeof(int));
-				if (p) w->flist = p;
+				p = realloc(w->flist, l * sizeof(int));
+				if (p)
+					w->flist = p;
 				if (w->jdata) {
-					jd = realloc(w->jdata,l*sizeof(struct jdata));
-					if (jd) w->jdata = jd;
-					jdf = realloc(w->jflbm,l*mj*sizeof(ABM));
-					if (jdf) w->jflbm = jdf;
+					jd = realloc(w->jdata,
+						     l * sizeof(struct jdata));
+					if (jd)
+						w->jdata = jd;
+					jdf =
+					    realloc(w->jflbm,
+						    l * mj * sizeof(ABM));
+					if (jdf)
+						w->jflbm = jdf;
 				}
 				if (w->sdata) {
-					sd = realloc(w->sdata,l*sizeof(struct sdata));
-					if (sd) w->sdata = sd;
+					sd = realloc(w->sdata,
+						     l * sizeof(struct sdata));
+					if (sd)
+						w->sdata = sd;
 				}
 			}
 		}
 		w->flistlen = l;
-		if (l == 0&&!w->fe) return -2; // no options left and was not fully entered by user
-		if (!aed) continue; // not all entries determined yet, so don't commit
-		if (jmode == 1) { // final check that the "jumble" is not actually a cyclic permutation etc.
-			for(i = 0,k = 0;i<l;i++) {w->flist[k] = w->flist[i]; if (checkperm(w,k,0)) k++;}
+		if (l == 0 && !w->fe)
+			return -2;	// no options left and was not fully entered by user
+		if (!aed)
+			continue;	// not all entries determined yet, so don't commit
+		if (jmode == 1) {	// final check that the "jumble" is not actually a cyclic permutation etc.
+			for (i = 0, k = 0; i < l; i++) {
+				w->flist[k] = w->flist[i];
+				if (checkperm(w, k, 0))
+					k++;
+			}
 			l = k;
 		}
 		w->flistlen = l;
-		if (l == 0&&!w->fe) return -2; // no options left and was not fully entered by user
+		if (l == 0 && !w->fe)
+			return -2;	// no options left and was not fully entered by user
 		assert(w->commitdep == -1);
-		for(k = 0;k<l;k++) setused(w->flist[k],1); // flag as used (can be more than one in jumble case)
+		for (k = 0; k < l; k++)
+			setused(w->flist[k], 1);	// flag as used (can be more than one in jumble case)
 		w->commitdep = sdep;
 	}
 
-	for(i = 0;i<ne;i++) entries[i].upd = 0; // all entry update effects now propagated into word updates
+	for (i = 0; i < ne; i++)
+		entries[i].upd = 0;	// all entry update effects now propagated into word updates
 	//  DEB1 printf("settleents returns %d\n",f);fflush(stdout);
 	return f;
 }
