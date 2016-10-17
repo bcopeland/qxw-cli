@@ -142,7 +142,8 @@ static bool word_has_updates(struct word *word)
 
 /*
  * Find all lights in the list of light indices whose character at
- * index wp satisfies feasible letter bitmap m.
+ * index wp satisfies feasible letter bitmap m and copy them to the
+ * front of p.  Return the length of the new valid list.
  */
 static int listisect(int *p, int *lights, int lights_len, int wp, ABM m)
 {
@@ -478,19 +479,17 @@ static int search() {
 
 	// Initially entry flbms are not consistent with word lists or vice versa. So we
 	// need to make sure we call both settlewds() and settleents() before proceeding.
-	if (settlewds() == -3) {DEB1 printf("aborting...\n"); return -5;};
+	settlewds();
+
 resettle: // "unit propagation"
 	do {
 		f = settleents(); // rescan entries
-		if (f == -3) {DEB1 printf("aborting...\n"); return -5;}
 		if (f == 0) break;
 		if (f == -1) return -1; // out of memory: abort
 		if (f == -2) goto backtrack; // proved impossible
 		f = settlewds(); // rescan words
-		if (f == -3) {DEB1 printf("aborting...\n"); return -5;}
 	} while(f); // need to iterate until everything settles down
 	f = mkscores();
-	if (f == -3) {DEB1 printf("aborting...\n"); return -5;}
 	if (fillmode == 0||fillmode == 3) return 2; // only doing BG/preexport fill? stop after first settle
 	DEB16 pstate(1);
 
