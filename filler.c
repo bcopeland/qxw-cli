@@ -158,10 +158,13 @@ static int listisect(int *p, int *lights, int lights_len, int wp, ABM m)
 /*
  * For all updated entries in a given word, reduce the feasible
  * list to the words that match the current bitmaps.
+ *
+ * Returns true if updates were made.
  */
-static int update_feasible_words(struct word *word, int len)
+static bool update_feasible_words(struct word *word, int len)
 {
 	int i;
+	int *p;
 	struct entry *entry;
 
 	for (i = 0; i < word->nent; i++) {
@@ -173,7 +176,21 @@ static int update_feasible_words(struct word *word, int len)
 		if (!len)
 			break;
 	}
-	return len;
+
+	/* no changes */
+	if (len == word->flistlen)
+		return false;
+
+	word->upd = 1;
+	word->flistlen = len;
+
+	/* try to shrink list */
+	if (len) {
+		p = realloc(word->flist, word->flistlen * sizeof(int));
+		if (p)
+			word->flist = p;
+	}
+	return true;
 }
 
 static int prune_used_words(struct word *word)
@@ -195,11 +212,10 @@ static int prune_used_words(struct word *word)
 static int settleents(void)
 {
 	struct word *w;
-	int f, i, j, k, l, m;
+	int i, j, k, l, m;
 	int *p;
 	bool aed;
-
-	f = 0;
+	bool changed = false;
 
 	for (j = 0; j < nw; j++) {
 
@@ -225,25 +241,14 @@ static int settleents(void)
 		}
 
 		l = prune_used_words(w);
+		changed |= update_feasible_words(w, l);
 
-		l = update_feasible_words(w, l);
-
-		if (l != w->flistlen) {
-			w->upd = 1;
-			f++;	// word list has changed: feasible letter lists will need updating
-			if (l) {
-				p = realloc(w->flist, l * sizeof(int));
-				if (p)
-					w->flist = p;
-			}
-		}
-		w->flistlen = l;
-		if (l == 0 && !w->fe)
+		if (!w->flistlen && !w->fe)
 			return -2;	// no options left and was not fully entered by user
 		if (!aed)
 			continue;	// not all entries determined yet, so don't commit
 		assert(w->commitdep == -1);
-		for (k = 0; k < l; k++)
+		for (k = 0; k < w->flistlen; k++)
 			setused(w->flist[k], 1);	// flag as used (can be more than one in jumble case)
 		w->commitdep = sdep;
 	}
@@ -251,7 +256,7 @@ static int settleents(void)
 	for (i = 0; i < ne; i++)
 		entries[i].upd = 0;	// all entry update effects now propagated into word updates
 	//  DEB1 printf("settleents returns %d\n",f);fflush(stdout);
-	return f;
+	return changed;
 }
 
 // check updated word lists, rebuild feasible entry lists
