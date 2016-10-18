@@ -128,7 +128,9 @@ static int findcritent(void) {int i,j,m;double k,l;
 	return j; // return -1 if no entries left to expand
 }
 
-
+/*
+ * Return true if any entries for a given word have been updated.
+ */
 static bool word_has_updates(struct word *word)
 {
 	int i;
@@ -194,6 +196,9 @@ static bool update_feasible_words(struct word *word)
 	return true;
 }
 
+/*
+ * Remove candidates we already used from this word's list.
+ */
 static bool prune_used_words(struct word *word)
 {
 	int i, len;
@@ -225,12 +230,25 @@ static void stack_save_wordlist(struct word *word, int sdep, int j)
 	if (sflistlen[sdep][j] != -1)
 		return;
 
+	/* save and make a new copy of list to work on */
 	sflist[sdep][j] = word->flist;
 	sflistlen[sdep][j] = word->flistlen;
-
-	/* make a new copy of list to work on */
 	word->flist = xmemdup(word->flist, word->flistlen * sizeof(int));
 }
+
+/*
+ * Check if a single letter satisfies every entry in this word;
+ * if so then the word is completed.
+ */
+static bool all_entries_determined(struct word *word)
+{
+	int k;
+	for (k = 0; k < word->nent; k++)
+		if (!onebit(word->e[k]->flbm))
+			break;
+	return k == word->nent;
+}
+
 
 /*
  * Check updated entries and rebuild feasible word lists
@@ -239,34 +257,30 @@ static void stack_save_wordlist(struct word *word, int sdep, int j)
 static int settleents(void)
 {
 	struct word *w;
-	int i, j, k, m;
-	bool aed;
+	int i, j;
 	bool changed = false;
 
-	for (j = 0; j < nw; j++) {
+	for (i = 0; i < nw; i++) {
 		/* check this word for any updated entries (cells) */
-		w = &words[j];
+		w = &words[i];
 		if (!word_has_updates(w))
 			continue;
 
-		m = w->nent;
-		for (k = 0; k < m; k++)
-			if (!onebit(w->e[k]->flbm))
-				break;
-		aed = (k == m);	// all entries determined?
-
-		stack_save_wordlist(w, sdep, j);
+		stack_save_wordlist(w, sdep, i);
 
 		changed |= prune_used_words(w);
 		changed |= update_feasible_words(w);
 
+		/* no solution? */
 		if (!w->flistlen && !w->fe)
-			return -2;	// no options left and was not fully entered by user
-		if (!aed)
-			continue;	// not all entries determined yet, so don't commit
+			return -2;
+		if (!all_entries_determined(w))
+			continue;
+
+		/* fixed this word at this stack level */
 		assert(w->commitdep == -1);
-		for (k = 0; k < w->flistlen; k++)
-			setused(w->flist[k], 1);	// flag as used (can be more than one in jumble case)
+		for (j = 0; j < w->flistlen; j++)
+			setused(w->flist[j], 1);
 		w->commitdep = sdep;
 	}
 
