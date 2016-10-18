@@ -176,6 +176,17 @@ static int update_feasible_words(struct word *word, int len)
 	return len;
 }
 
+static int prune_used_words(struct word *word)
+{
+	int i, len;
+
+	for (i = 0, len = 0; i < word->flistlen; i++) {
+		if (!isused(word->flist[i]))
+			word->flist[len++] = word->flist[i];
+	}
+	return len;
+}
+
 
 /*
  * Check updated entries and rebuild feasible word lists
@@ -210,14 +221,10 @@ static int settleents(void)
 			w->flist = (int *)malloc(l * sizeof(int));	// new list can be at most as long as old one
 			if (!w->flist)
 				return -1;	// out of memory
+			memcpy(w->flist, p, l * sizeof(int));
 		}
-		if (afunique) {	// the following test makes things quite a lot slower: consider optimising by keeping track of when an update might be needed
-			for (i = 0, k = 0; i < l; i++)
-				if (!isused(p[i]))
-					w->flist[k++] = p[i];
-			p = w->flist;
-			l = k;
-		}
+
+		l = prune_used_words(w);
 
 		l = update_feasible_words(w, l);
 
@@ -268,6 +275,7 @@ static int settlewds(void)
 		p = w->flist;
 		l = w->flistlen;
 
+		/* compute bitmap of letters in this word's wordlist */
 		for (k = 0; k < m; k++)
 			entfl[k] = 0;
 		for (j = 0; j < l; j++)
