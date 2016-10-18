@@ -161,11 +161,12 @@ static int listisect(int *p, int *lights, int lights_len, int wp, ABM m)
  *
  * Returns true if updates were made.
  */
-static bool update_feasible_words(struct word *word, int len)
+static bool update_feasible_words(struct word *word)
 {
 	int i;
 	int *p;
 	struct entry *entry;
+	int len = word->flistlen;
 
 	for (i = 0; i < word->nent; i++) {
 		entry = word->e[i];
@@ -193,7 +194,7 @@ static bool update_feasible_words(struct word *word, int len)
 	return true;
 }
 
-static int prune_used_words(struct word *word)
+static bool prune_used_words(struct word *word)
 {
 	int i, len;
 
@@ -201,9 +202,35 @@ static int prune_used_words(struct word *word)
 		if (!isused(word->flist[i]))
 			word->flist[len++] = word->flist[i];
 	}
-	return len;
+	if (len == word->flistlen)
+		return false;
+
+	word->flistlen = len;
+	return true;
 }
 
+static void *xmemdup(void *src, size_t size)
+{
+	void *p = malloc(size);
+	if (!p)
+		exit(-1);
+
+	memcpy(p, src, size);
+	return p;
+}
+
+static void stack_save_wordlist(struct word *word, int sdep, int j)
+{
+	/* already saved? */
+	if (sflistlen[sdep][j] != -1)
+		return;
+
+	sflist[sdep][j] = word->flist;
+	sflistlen[sdep][j] = word->flistlen;
+
+	/* make a new copy of list to work on */
+	word->flist = xmemdup(word->flist, word->flistlen * sizeof(int));
+}
 
 /*
  * Check updated entries and rebuild feasible word lists
@@ -212,13 +239,11 @@ static int prune_used_words(struct word *word)
 static int settleents(void)
 {
 	struct word *w;
-	int i, j, k, l, m;
-	int *p;
+	int i, j, k, m;
 	bool aed;
 	bool changed = false;
 
 	for (j = 0; j < nw; j++) {
-
 		/* check this word for any updated entries (cells) */
 		w = &words[j];
 		if (!word_has_updates(w))
@@ -229,19 +254,11 @@ static int settleents(void)
 			if (!onebit(w->e[k]->flbm))
 				break;
 		aed = (k == m);	// all entries determined?
-		p = w->flist;
-		l = w->flistlen;
-		if (sflistlen[sdep][j] == -1) {	// then we mustn't trash words[].flist
-			sflist[sdep][j] = p;
-			sflistlen[sdep][j] = l;
-			w->flist = (int *)malloc(l * sizeof(int));	// new list can be at most as long as old one
-			if (!w->flist)
-				return -1;	// out of memory
-			memcpy(w->flist, p, l * sizeof(int));
-		}
 
-		l = prune_used_words(w);
-		changed |= update_feasible_words(w, l);
+		stack_save_wordlist(w, sdep, j);
+
+		changed |= prune_used_words(w);
+		changed |= update_feasible_words(w);
 
 		if (!w->flistlen && !w->fe)
 			return -2;	// no options left and was not fully entered by user
@@ -253,9 +270,10 @@ static int settleents(void)
 		w->commitdep = sdep;
 	}
 
+	/* all entry update effects now propagated into word updates */
 	for (i = 0; i < ne; i++)
-		entries[i].upd = 0;	// all entry update effects now propagated into word updates
-	//  DEB1 printf("settleents returns %d\n",f);fflush(stdout);
+		entries[i].upd = 0;
+
 	return changed;
 }
 
