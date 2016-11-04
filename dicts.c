@@ -63,24 +63,6 @@ AAAAAAECEEEEIIII\
 AAAAAAECEEEEIIII\
 .NOOOOO.OUUUUY.Y";
 
-// set up possible file encodings for dictionary files
-#define NFILEENC 6  
-
-struct fileenc {
-  char nenc[12];  // name of encoding for g_convert()
-  char bom[4];    // potential byte order mark at start of file
-  int lbom;       // length of byte order mark
-  };
-
-static struct fileenc fenc[NFILEENC] = {
-  {"ISO-8859-1",{'\x00'},                     0},
-  {"UTF-8"     ,{'\xEF','\xBB','\xBF'},       3},
-  {"UTF-16LE"  ,{'\xFF','\xFE'},              2},
-  {"UTF-16BE"  ,{'\xFE','\xFF'},              2},
-  {"UTF-32LE"  ,{'\xFF','\xFE','\x00','\x00'},4},
-  {"UTF-32BE"  ,{'\x00','\x00','\xFE','\xFF'},4}        
-};
-
 int chartol[256];
 ABM chartoabm[256];
 char ltochar[NL];
@@ -188,314 +170,51 @@ static int adddictword(char*s0,char*s1,int dn,pcre*sre,pcre*are,float f) {
   memblkp->ct++; // count words in this memblk
   return 1;
   }
- 
-// read n bytes from fp and interpret as little-endian integer
-static int getint(FILE*fp,int n) { int i,u; for(i=0,u=0;i<n;i++) u+=fgetc(fp)<<(i*8); return u; }
 
-#define MXHNODES 512
-static int hnodep[2][MXHNODES]; // "0" and "1" pointers or -1 for none
-static int hnodec[MXHNODES]; // char represented or -1 for none
-static int nhn;
+static size_t load_dict(const char *fn, int dn)
+{
+	#define delim " \t\n"
 
-// add a new Huffman tree entry for code m of length l representing i
-static int addhcode(int m,int l,int i) {
-  int *p;
-  int j,n;
+	char *line, *word, *score_str;
+	uint64_t score = 1;
+	size_t len;
+	int num_added = 0;
 
-DEB1 printf("addhcode(%d,%d,%d) nhn=%d\n",m,l,i,nhn);
-  for(n=0,j=l-1;j>=0;j--) { // big-endian...
-    p=hnodep[(m>>j)&1]+n;
-    if(*p==-1) { // node does not exist yet
-      if(nhn>=MXHNODES) return -1;
-      *p=nhn;
-      hnodep[0][nhn]=-1;
-      hnodep[1][nhn]=-1;
-      hnodec[nhn]=-1;
-      nhn++;
-      }
-    n=*p;
-    }
-  hnodec[n]=i;
-  return 0;
-  }
+	FILE *fp = fopen(fn, "rb");
+	if (!fp)
+		return 0;
 
-// Attempt to load a .TSD file. Return number of words >=0 on success, <0 on error.
-static int loadtsd(FILE*fp,int format,int dn,pcre*sre,pcre*are) {
-  int c,i,j,l,m,ml,n,u,nw;
-  int hoff[MXLE+1]; // file offsets into Huffman coded block
-  int dcount[MXLE+1]; // number of words of each length
-  char s0[SLEN],s1[SLEN];
-  GError*error=NULL;
-  gchar*sp=NULL;
+	while (!feof(fp)) {
+		line = word = score_str = NULL;
+		len = 0;
+		if (getline(&line, &len, fp) <= 0)
+			break;
 
-  DEB1 printf("attempting to load TSD format=0x%x\n",format);
-  if(format!='0'&&format!='1') return -1; // only TSD0 and TSD1 supported
-  if(fseek(fp,4,SEEK_SET)<0) return -1;
-  ml=getint(fp,2); // maximum length
-  if(ml<1) return -1;
-  DEB1 printf("ml=%d\n",ml);
-  if(format=='1') getint(fp,12*ml+12); // skip some bytes
-  for(i=0;i<ml;i++) {
-    u=getint(fp,4);
-    if(u<0) return -1;
-    if(i<=MXLE) hoff[i]=u;
-    }
-  for(i=0;i<ml;i++) {
-    u=getint(fp,4);
-    if(u<0) return -1;
-    if(i<=MXLE) {
-      dcount[i]=u;
-DEB1 printf("dcount[%d]=%d\n",i,u);
-      }
-    }
-  if(fseek(fp,format=='0'?80:1000,SEEK_CUR)<0) return -1; // skip comment
-  u=getint(fp,2); // ?
-  u=getint(fp,2); // ?
-DEB1 printf("hcode array at %08lx\n",ftell(fp));
-  nhn=1;
-  hnodep[0][0]=-1;
-  hnodep[1][0]=-1;
-  hnodec[0]=-1;
-  for(i=0;i<256;i++) { // loop over ISO-8859-1 characters
-    c=getint(fp,1); // character
-    l=getint(fp,1); // code length
-    u=getint(fp,2); // ?
-    m=getint(fp,4); // code
-    if(l>0) {
-DEB1 {
-        printf("%02x %c ",i,isprint(i)?i:'?');
-        for(j=l-1;j>=0;j--) printf("%d",(m>>j)&1);
-        printf("\n");
-        }
-      if(addhcode(m,l,i)<0) return -1;
-      }
-    }
-  nw=0;
-  for(l=1;l<ml;l++) {
-    if(l>MXLE) break;
-    if(hoff[l]==0) continue;
-    if(fseek(fp,hoff[l],SEEK_SET)<0) return -1;
-DEB1    printf("starting to read length %d at offset %08x; dstrings[%d]=%p memblkp=%p\n",l,hoff[l],dn,dstrings[dn],memblkp);
-    j=8;
-    c=0;
-    for(i=0;i<dcount[l];i++) {
-      m=0;
-      n=0;
-      for(;;) {
-        if(j==8) {j=0;c=fgetc(fp);if(c==EOF) return -1;}
-DEB16   printf("%d",(c>>j)&1);
-        n=hnodep[(c>>j)&1][n];
-        j++;
-        u=hnodec[n];
-        if(u!=-1) {
-DEB16     printf(" %02x %c\n",u,isprint(u)?u:'?');
-          if((u>=0x01&&u<0x7f)||(u>=0xa0&&u<=0xff)) {
-            s1[m]=u;
-            if(m<SLEN-1) m++; // don't overflow
-            }
-          n=0;
-          }
-        if(u==0) break;
-        }
-      if(format=='1') {
-        if(j==8) {j=0;c=fgetc(fp);if(c==EOF) return -1;} // skip a zero bit for some reason
-        j++;
-        }
-      if(m==SLEN-1) continue; // hit string limit? discard
-      s1[m]=0;
-      for(u=0;u<m;u++) if(s1[u]<0x20) break; // look for any non-printable character
-      s1[u]=0; // stop there
-      sp=g_convert(s1,-1,"UTF-8","ISO-8859-1",NULL,NULL,&error);
-      if(error) continue;
-      strcpy(s0,sp);    // UTF-8 form in s0
-      g_free(sp),sp=0;
-      u=adddictword(s0,s1,dn,sre,are,0.0);
-      if(u==-2) return -2;
-      if(u==1) nw++;
-      }
-    }
-  return nw;
-  }
+		word = strtok(line, delim);
+		if (!word)
+			continue;
 
+		score_str = strtok(NULL, delim);
+		if (score_str) {
+			score = strtoull(score_str, NULL, 10);
+			if (score == ULLONG_MAX)
+				score = 1;
+		}
+		if (adddictword(word, word, dn, NULL, NULL, (float) score) == 1)
+			num_added++;
 
-static int loadonedict(int dn,int sil) { // return number of answers loaded
-  int at,i,j;
-  FILE *fp=0;
-  char s0[SLEN]; // citation form
-  char s1[SLEN]; // light form
-  gchar t[SLEN+1]; // input buffer
-
-  float f;
-  int mode,owd,rc;
-  pcre*sre,*are;
-  const char*pcreerr;
-  int pcreerroff;
-  char sfilter[SLEN+1];
-  char afilter[SLEN+1];
-  GError *error = NULL;
-  gchar *sp = NULL;
-  gsize l0;
-  char bom[5];
-
-  rc=0;
-  owd=0;
-  at=0;
-  freedstrings(dn);
-  memblkl=0; // number of bytes stored so far in current memory block
-  memblkp=0; // current memblk being filled
-  if(dfnames[dn][0]=='\0') {
-    if(dafilters[dn][0]=='\0') return 0; // dictionary slot unused
-    owd=1; // one-word dictionary
-    sre=0;
-    are=0;
-    goto ew3;
-    }
-  strcpy(sfilter,dsfilters[dn]);
-  if(!strcmp(sfilter,"")) sre=0;
-  else {
-    sre=pcre_compile(sfilter,PCRE_CASELESS,&pcreerr,&pcreerroff,0);
-    if(pcreerr) {
-      sprintf(t,"Dictionary %d\nBad file filter syntax: %.100s",dn+1,pcreerr);
-      reperr(t);
-      }
-    }
-  strcpy(afilter,dafilters[dn]);
-  if(!strcmp(afilter,"")) are=0;
-  else {
-    are=pcre_compile(afilter,PCRE_CASELESS,&pcreerr,&pcreerroff,0);
-    if(pcreerr) {
-      sprintf(t,"Dictionary %d\nBad answer filter syntax: %.100s",dn+1,pcreerr);
-      reperr(t);
-      }
-    }
-
-ew3:
-  mode=-1;    // Indicates file encoding not set by BOM in file
-  if(owd) { mode=1; goto retry; }   // Always set file encoding to UTF-8 for one-word dictionary
-  fp=fopen(dfnames[dn],"rb"); // try first in binary mode
-  if(!fp) {
-    sprintf(t,"Dictionary %d\nFile not found",dn+1);
-    if(!sil) reperr(t);
-    rc=-1; goto exit;
-    }
-  if(fread(bom,1,4,fp)<4) {rewind(fp); goto retry;} // too short for a BOM, so use mode -1
-  if(!strncmp(bom,"TSD",3)) {
-    i=loadtsd(fp,bom[3],dn,sre,are);
-    if(i>=0) {at=i; goto exit;} // successfully read
-    }
-  rewind(fp);
-  if(fgets(bom,5,fp)!=NULL) {       // re-read BOM at start of file
-    for(i=0; i<NFILEENC; i++) {
-      if(fenc[i].lbom>0) {
-        if(!(memcmp(bom,fenc[i].bom,fenc[i].lbom))) {
-          mode=i;                             // BOM found so set mode
-          fseek(fp,fenc[i].lbom,SEEK_SET);    // and skip past BOM 
-          break;
-          }
-        }
-      }   // end of for loop
-    if(mode>1) {    // Cannot read this file encoding mode
-      sprintf(t,"Dictionary %d\nCannot read file encoding:\ntry UTF-8 or ISO-8859-1 encoding",dn+1);
-      if(!sil) reperr(t);
-      rc=-1; goto exit;
-      }
-    if(mode==-1) rewind(fp);    // No BOM, so read words from start of file
-    }
-retry:
-  at=0;
-  freedstrings(dn);
-  memblkl=0; // number of bytes stored so far in current memory block
-  memblkp=0; // current memblk being filled
-  dstrings[dn]=0;
-  DEB1 printf("Reading dictionary file %s (in mode %d), owd=%d\n",dfnames[dn],mode,owd);
-  for(;;) {       // Loop through dictionary 'words' until EOF
-    if(owd) strcpy(t,dafilters[dn]);
-    else {
-      if(feof(fp)) break;
-      if(fgets(t,SLEN,fp)==NULL) break;
-      }
-    j=strlen(t)-1;
-    if(j<0) goto skipword;
-    while(j>=0&&t[j]>=0&&t[j]<=' ') t[j--]=0;     // Strip control characters/white space from end of string
-    while (j>=0&&((t[j]>='0'&&t[j]<='9')||t[j]=='.'||t[j]=='+'||t[j]=='-')) j--;  // get score (if any) from end
-    j++;
-    f=0.0;
-    if(j==0||t[j-1]!=' ') j=strlen(t); // all digits, or no space? treat it as a 'word'
-    else {
-      sscanf(t+j,"%f",&f);
-      if(f>= 10.0) f= 10.0;
-      if(f<=-10.0) f=-10.0;
-      t[j--]=0; // rest of input is treated as a 'word' (which may contain spaces)
-      }
-    while(j>=0&&t[j]>=0&&t[j]<=' ') t[j--]=0;  // remove trailing white space
-    j++;
-    if(j<1) goto skipword;
-
-    // t now contains 'word' for conversion; convert it first to UTF-8 for use as citation form
-    if(mode>-1) {     // Use encoding mode based on BOM
-      sp=g_convert(t,-1,"UTF-8",fenc[mode].nenc,NULL,&l0,&error);
-      if(error) {
-        sprintf(t,"Dictionary %d\nFile not encoded in accordance with its BOM",dn+1);
-        if(!sil) reperr(t);
-        rc=-1; goto exit;
-        }
-    } else { // try fallback encodings in turn
-      if(mode==-1) sp=g_convert(t,-1,"UTF-8","UTF-8",NULL,&l0,&error); // effectively a check for valid UTF-8
-      if(mode==-2) sp=g_convert(t,-1,"UTF-8","ISO-8859-1",NULL,&l0,&error);
-      if(error) {
-        DEB1 {
-          printf("error: %s\n",error->message);
-          for(i=0;t[i];i++) printf(" %02x",t[i]);
-          printf("\n");
-          }
-        g_clear_error(&error);
-        freedstrings(dn);
-        rewind(fp);
-        mode--;
-        if(mode>-3) goto retry; // go round again and try next encoding
-        // here if none of the encodings worked 
-        sprintf(t,"Dictionary %d\nFile does not use a recognised encoding:\ntry UTF-8 or ISO-8859-1",dn+1);
-        if(!sil) reperr(t);
-        rc=-1; goto exit;
-        }
-      }
-    // here we have UTF-8 citation form of string in sp, length in l0
-    if(l0>=SLEN) goto skipword;
-    strcpy(s0,sp);
-    g_free(sp),sp=0;
-
-    // Now convert s0 to ISO-8859-1 to create untreated light form
-    sp=g_convert(s0,-1,"ISO-8859-1","UTF-8",NULL,NULL,&error);
-    if(error==NULL) {strcpy(s1,sp);}    // ISO-8859-1 form in s1
-    else {
-      DEB1 printf("Failed conversion to ISO-8859-1: %s\n",s0);
-      goto skipword;   // 'word' contained symbols outside of Latin-1 character set; go to next word
-      }
-    i=adddictword(s0,s1,dn,sre,are,f);
-    if(i==-2) {rc=-2; goto exit;}
-    if(i==1) at++;
-
-skipword:
-    if(sp) g_free(sp),sp=0;
-    g_clear_error(&error);
-    if(owd) break;
-    }  // End of 'word' for loop
-
-exit:
-  if(sp) g_free(sp),sp=0;
-  if(sre) pcre_free(sre);
-  if(are) pcre_free(are);
-  g_clear_error(&error);
-  if(!owd) if(fp) fclose(fp);
-  if(rc<0) return rc; else return at;
-  }
+		free(line);
+	}
+	return num_added;
+}
 
 int loaddicts(int sil) { // load (or reload) dictionaries from dfnames[]
   // sil=1 suppresses error reporting
   // returns: 0=success; 1=bad file; 2=no words; 4=out of memory
   struct answer*ap;
   struct memblk*p;
-  int at,dn,i,j,k,l,rc,u;
+  int at,dn,i,j,k,l,rc;
+  size_t n;
   char t[SLEN];
   unsigned int h;
 
@@ -504,11 +223,12 @@ int loaddicts(int sil) { // load (or reload) dictionaries from dfnames[]
   rc=0;
 
   for(dn=0;dn<MAXNDICTS;dn++) {
-    u=loadonedict(dn,sil);
-    if(u==-2) goto ew4; // out of memory
-    if(u<0) rc=1;
-    else at+=u;
-    }
+    if (!strlen(dfnames[dn]))
+	continue;
+
+    n=load_dict(dfnames[dn], dn);
+    at += n;
+  }
 
   if(at==0) {  // No words from any dictionary
     sprintf(t,"No words available from any dictionary");
