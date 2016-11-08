@@ -32,6 +32,7 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 #include <glib.h>   // required for string conversion functions
 
 #include <dlfcn.h>
+#include <iconv.h>
 
 #include "common.h"
 #include "dicts.h"
@@ -175,24 +176,40 @@ static size_t load_dict(const char *fn, int dn)
 {
 	#define delim " \t\n"
 
-	char *line, *word, *score_str;
+	char *line, *word, *word_latin, *score_str;
+	char *in_buf, *out_buf;
+	size_t in_len, out_len;
 	uint64_t score = 1;
 	size_t len;
 	int num_added = 0;
+	int ret;
+
+	iconv_t ictx = iconv_open("ISO-8859-1", "UTF-8");
+	if (ictx == (iconv_t) -1)
+		return 0;
 
 	FILE *fp = fopen(fn, "rb");
 	if (!fp)
 		return 0;
 
 	while (!feof(fp)) {
-		line = word = score_str = NULL;
+		line = word = word_latin = score_str = NULL;
 		len = 0;
 		if (getline(&line, &len, fp) <= 0)
 			break;
 
 		word = strtok(line, delim);
 		if (!word)
-			continue;
+			goto next;
+
+		word_latin = calloc(strlen(word) + 1, 1);
+		in_buf = word;
+		in_len = strlen(word);
+		out_buf = word_latin;
+		out_len = strlen(word);
+		ret = iconv(ictx, &in_buf, &in_len, &out_buf, &out_len);
+		if (ret == (size_t) -1)
+			goto next;
 
 		score_str = strtok(NULL, delim);
 		if (score_str) {
@@ -200,9 +217,10 @@ static size_t load_dict(const char *fn, int dn)
 			if (score == ULLONG_MAX)
 				score = 1;
 		}
-		if (adddictword(word, word, dn, NULL, NULL, (float) score) == 1)
+		if (adddictword(word, word_latin, dn, NULL, NULL, (float) score) == 1)
 			num_added++;
-
+next:
+		free(word_latin);
 		free(line);
 	}
 	return num_added;
