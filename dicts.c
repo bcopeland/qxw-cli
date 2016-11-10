@@ -33,6 +33,7 @@ Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include <dlfcn.h>
 #include <iconv.h>
+#include <math.h>
 
 #include "common.h"
 #include "dicts.h"
@@ -180,6 +181,8 @@ static size_t load_dict(const char *fn, int dn)
 	char *in_buf, *out_buf;
 	size_t in_len, out_len;
 	uint64_t score = 1;
+	uint64_t max_score = 0;
+	float logprob;
 	size_t len;
 	int num_added = 0;
 	int ret;
@@ -191,6 +194,25 @@ static size_t load_dict(const char *fn, int dn)
 	FILE *fp = fopen(fn, "rb");
 	if (!fp)
 		return 0;
+
+	// first pass: get max score
+	while (!feof(fp)) {
+		line = word = word_latin = score_str = NULL;
+		if (getline(&line, &len, fp) <= 0)
+			break;
+
+		word = strtok(line, delim);
+		score_str = strtok(NULL, delim);
+		if (score_str) {
+			score = strtoull(score_str, NULL, 10);
+			if (score == ULLONG_MAX)
+				score = 1;
+			if (score > max_score)
+				max_score = score;
+		}
+		free(line);
+	}
+	rewind(fp);
 
 	while (!feof(fp)) {
 		line = word = word_latin = score_str = NULL;
@@ -217,7 +239,13 @@ static size_t load_dict(const char *fn, int dn)
 			if (score == ULLONG_MAX)
 				score = 1;
 		}
-		if (adddictword(word, word_latin, dn, NULL, NULL, (float) score) == 1)
+		logprob = 10.0 + log10(score / (double) max_score);
+		if (logprob < -10.0)
+			logprob = -10.0;
+		if (logprob > 10.0)
+			logprob = 10.0;
+
+		if (adddictword(word, word_latin, dn, NULL, NULL, logprob) == 1)
 			num_added++;
 next:
 		free(word_latin);
